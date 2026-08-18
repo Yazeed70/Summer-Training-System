@@ -36,6 +36,7 @@ import { CollegeEvaluationsPage } from '../pages/college/CollegeEvaluationsPage'
 
 // Company Pages
 import { CompanyDashboardPage } from '../pages/company/CompanyDashboardPage';
+import { CompanyProfilePage } from '../pages/company/CompanyProfilePage';
 import { CompanyTraineesPage } from '../pages/company/CompanyTraineesPage';
 import { CompanyTemplatesPage } from '../pages/company/CompanyTemplatesPage';
 import { CompanyEvaluationsPage } from '../pages/company/CompanyEvaluationsPage';
@@ -100,6 +101,7 @@ export const router = createBrowserRouter([
             element: <ProtectedRoute allowedRoles={[enRoles.CompanyRep]} />,
             children: [
               { path: '/company', element: <CompanyDashboardPage /> },
+              { path: '/company/profile', element: <CompanyProfilePage /> },
               { path: '/company/trainees', element: <CompanyTraineesPage /> },
               { path: '/company/templates', element: <CompanyTemplatesPage /> },
               { path: '/company/evaluations', element: <CompanyEvaluationsPage /> },

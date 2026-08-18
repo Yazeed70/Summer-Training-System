@@ -66,29 +66,29 @@ export const RegisterPage: React.FC = () => {
           {t('auth.registerTitle')}
         </h2>
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          Create a new account to access the Summer Training System
+          {t('auth.registerSubtitle')}
         </p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <Input
-          label="Full Name"
-          placeholder="e.g. John Doe"
+          label={t('auth.fullName', 'Full Name')}
+          placeholder={t('auth.fullNamePlaceholder', 'e.g. John Doe')}
           leftIcon={<User className="w-4 h-4" />}
           error={errors.name?.message}
           {...register('name')}
         />
 
         <Input
-          label="Username"
-          placeholder="e.g. jdoe or student_user"
+          label={t('auth.username', 'Username')}
+          placeholder={t('auth.usernamePlaceholder', 'e.g. jdoe or student_user')}
           leftIcon={<User className="w-4 h-4" />}
           error={errors.username?.message}
           {...register('username')}
         />
 
         <Input
-          label={t('auth.password')}
+          label={t('auth.password', 'Password')}
           type="password"
           placeholder="••••••••"
           leftIcon={<Lock className="w-4 h-4" />}
@@ -97,7 +97,7 @@ export const RegisterPage: React.FC = () => {
         />
 
         <Input
-          label="Confirm Password"
+          label={t('auth.confirmPassword', 'Confirm Password')}
           type="password"
           placeholder="••••••••"
           leftIcon={<Lock className="w-4 h-4" />}

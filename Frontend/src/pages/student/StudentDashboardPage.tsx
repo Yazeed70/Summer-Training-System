@@ -163,9 +163,7 @@ export const StudentDashboardPage: React.FC = () => {
       setAcceptanceFile(null);
       fetchData();
     } catch (err: any) {
-      console.error('Failed to submit request:', err);
-      const msg = err.response?.data?.devMessage || err.response?.data?.message || 'Failed to submit training request.';
-      toast.error(msg);
+      console.error('Failed to submit training request:', err);
     } finally {
       setSubmitting(false);
     }

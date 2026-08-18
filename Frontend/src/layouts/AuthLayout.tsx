@@ -29,7 +29,7 @@ export const AuthLayout: React.FC = () => {
             </div>
             <div>
               <h1 className="text-lg font-bold tracking-tight">{t('common.appName')}</h1>
-              <p className="text-xs text-indigo-200">Management & Progress Evaluation System</p>
+              <p className="text-xs text-indigo-200">{t('auth.brandingSubtitle')}</p>
             </div>
           </div>
 
@@ -55,32 +55,32 @@ export const AuthLayout: React.FC = () => {
         {/* Hero Banner Content */}
         <div className="relative z-10 my-auto py-12 space-y-6 max-w-xl">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
-            <ShieldCheck className="w-4 h-4" /> Enterprise Academic Platform
+            <ShieldCheck className="w-4 h-4" /> {t('auth.brandingBadge')}
           </div>
 
           <h2 className="text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight text-white">
-            Streamlining Internship Workflows & Performance Evaluation
+            {t('auth.brandingTitle')}
           </h2>
 
           <p className="text-sm text-indigo-200/90 leading-relaxed">
-            Connect Students, Colleges, and Industry Partners in one unified portal with real-time request tracking, automated acceptance letter validation, dynamic report submissions, and multi-tier evaluations.
+            {t('auth.brandingDescription')}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
             <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-xs">
               <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-              <span className="text-xs font-medium text-indigo-100">Role-Based Access Control</span>
+              <span className="text-xs font-medium text-indigo-100">{t('auth.featureRbac')}</span>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-xs">
               <FileCheck className="w-5 h-5 text-emerald-400 shrink-0" />
-              <span className="text-xs font-medium text-indigo-100">Dynamic Custom Reports</span>
+              <span className="text-xs font-medium text-indigo-100">{t('auth.featureReports')}</span>
             </div>
           </div>
         </div>
 
         {/* Footer info */}
         <div className="relative z-10 pt-6 border-t border-white/10 text-xs text-indigo-300/80 flex items-center justify-between">
-          <span>&copy; {new Date().getFullYear()} Summer Training System</span>
+          <span>&copy; {new Date().getFullYear()} {t('common.appName')}</span>
           <span>v1.0.0</span>
         </div>
       </div>

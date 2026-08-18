@@ -71,6 +71,7 @@ export interface EvaluateReportDto {
   studentReportPublicId: string;
   score: enEvaluationScore;
   feedback?: string;
+  comments?: string;
 }
 
 export interface StudentReportSummaryDto {
@@ -94,12 +95,17 @@ export interface CollegeStudentReportDto {
   studentId?: string;
   companyName?: string;
   templateTitle: string;
+  reportTitle?: string;
   status: enReportStatus;
-  submittedAt: string;
+  submittedAt?: string;
+  submissionDate?: string;
   companyScore?: enEvaluationScore;
   companyFeedback?: string;
   collegeScore?: enEvaluationScore;
   collegeFeedback?: string;
+  evaluationScore?: enEvaluationScore;
+  evaluationComments?: string;
+  evaluatedAt?: string;
 }
 
 export interface CompanyStudentReportDto {
@@ -107,9 +113,53 @@ export interface CompanyStudentReportDto {
   studentName: string;
   studentId?: string;
   collegeName?: string;
-  templateTitle: string;
+  templateTitle?: string;
+  reportTitle?: string;
   status: enReportStatus;
-  submittedAt: string;
+  submittedAt?: string;
+  submissionDate?: string;
   companyScore?: enEvaluationScore;
   companyFeedback?: string;
+  evaluationScore?: enEvaluationScore;
+  evaluationComments?: string;
+  evaluatedAt?: string;
+}
+
+export interface ReportAnswerDetailDto {
+  questionId: number;
+  questionText: string;
+  questionType: enQuestionType;
+  orderPosition: number;
+  isRequired: boolean;
+  optionsPayload?: string;
+  options?: string[];
+  answerValue: string;
+  attachmentPath?: string;
+}
+
+export interface StudentReportDetailsDto {
+  studentReportPublicId: string;
+  templatePublicId: string;
+  templateTitle: string;
+  templateDescription?: string;
+  dueDate?: string;
+  submissionDate?: string;
+  status: enReportStatus;
+  studentId: number;
+  studentName: string;
+  studentEmail?: string;
+  collegeName?: string;
+  companyName?: string;
+  requiresCompanyEvaluation: boolean;
+  requiresCollegeEvaluation: boolean;
+  canDelete: boolean;
+  answers: ReportAnswerDetailDto[];
+  companyScore?: enEvaluationScore;
+  companyFeedback?: string;
+  companyEvaluatedAt?: string;
+  companyEvaluatorName?: string;
+  collegeScore?: enEvaluationScore;
+  collegeFeedback?: string;
+  collegeEvaluatedAt?: string;
+  collegeEvaluatorName?: string;
 }

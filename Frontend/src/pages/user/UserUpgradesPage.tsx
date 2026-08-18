@@ -13,7 +13,6 @@ import {
   Building2,
   CheckCircle2,
   Info,
-  Sparkles,
 } from 'lucide-react';
 import { userService } from '../../api/userService';
 import { lookupsService, LookupItem } from '../../api/lookupsService';
@@ -161,57 +160,44 @@ export const UserUpgradesPage: React.FC = () => {
 
   const columns: Column<UpgradeRequestDetailsDto>[] = [
     {
-      header: 'Requested Role',
+      header: t('admin.requestedRoleCol', 'Requested Role'),
       cell: (item) => <Badge variant="indigo">{item.requestedRole}</Badge>,
     },
     {
-      header: 'Target Entity',
+      header: t('admin.affiliationTargetCol', 'Target Entity'),
       cell: (item) => item.collegeName || item.companyName || '-',
     },
     {
-      header: 'Official Email',
+      header: t('admin.officialEmail', 'Official Email'),
       cell: (item) => item.officialEmail || '-',
     },
     {
-      header: 'Submitted Date',
+      header: t('admin.submissionDate', 'Submitted Date'),
       cell: (item) => new Date(item.createdAt).toLocaleDateString(),
     },
     {
-      header: 'Status',
+      header: t('common.status', 'Status'),
       cell: (item) => {
         const val = String(item.status);
-        const variantMap: Record<string, 'warning' | 'success' | 'danger' | 'neutral'> = {
-          [enRequestStatus.Pending]: 'warning',
-          [enRequestStatus.Approved]: 'success',
-          [enRequestStatus.Rejected]: 'danger',
-          [enRequestStatus.Deleted]: 'neutral',
-          '1': 'warning',
-          '2': 'success',
-          '3': 'danger',
-          '4': 'neutral',
-        };
-        const labelMap: Record<string, string> = {
-          [enRequestStatus.Pending]: 'Pending Review',
-          [enRequestStatus.Approved]: 'Approved',
-          [enRequestStatus.Rejected]: 'Rejected',
-          [enRequestStatus.Deleted]: 'Canceled',
-          '1': 'Pending Review',
-          '2': 'Approved',
-          '3': 'Rejected',
-          '4': 'Canceled',
-        };
-        return <Badge variant={variantMap[val] ?? 'neutral'}>{labelMap[val] ?? val}</Badge>;
+        const isApp = val === String(enRequestStatus.Approved) || val === '2' || val.toLowerCase() === 'approved';
+        const isRej = val === String(enRequestStatus.Rejected) || val === '3' || val.toLowerCase() === 'rejected';
+        const isDel = val === String(enRequestStatus.Deleted) || val === '4' || val.toLowerCase() === 'deleted' || val.toLowerCase() === 'canceled';
+
+        if (isApp) return <Badge variant="success">{t('common.approved', 'Approved')}</Badge>;
+        if (isRej) return <Badge variant="danger">{t('common.rejected', 'Rejected')}</Badge>;
+        if (isDel) return <Badge variant="neutral">{t('admin.deletedByUser', 'Canceled')}</Badge>;
+        return <Badge variant="warning">{t('common.pending', 'Pending Review')}</Badge>;
       },
     },
     {
-      header: t('common.actions'),
+      header: t('common.actions', 'Actions'),
       cell: (item) => (
         <div className="flex items-center gap-1.5">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => handleViewDetails(item)}
-            title="View Application Details"
+            title={t('admin.inspectRequest', 'View Application Details')}
           >
             <Eye className="w-4 h-4 text-slate-500 hover:text-indigo-600" />
           </Button>
@@ -220,7 +206,7 @@ export const UserUpgradesPage: React.FC = () => {
               variant="ghost"
               size="sm"
               onClick={() => handleOpenProofViewer(item.id, item.requestedRole)}
-              title="View Attached Proof Document"
+              title={t('admin.viewDocBtn', 'View Attached Proof Document')}
             >
               <FileText className="w-4 h-4 text-indigo-500 hover:text-indigo-600" />
             </Button>
@@ -234,9 +220,11 @@ export const UserUpgradesPage: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Role Upgrade Center</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+            {t('nav.roleUpgradeCenter', 'Role Upgrade Center')}
+          </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Submit applications to become a Student, College Representative, or Company Representative
+            {t('admin.upgradesSubtitle', 'Submit applications to become a Student, College Representative, or Company Representative')}
           </p>
         </div>
 
@@ -247,7 +235,7 @@ export const UserUpgradesPage: React.FC = () => {
             onClick={() => setStudentModalOpen(true)}
             leftIcon={<GraduationCap className="w-4 h-4 text-indigo-500" />}
           >
-            Upgrade to Student
+            {t('roles.student', 'Upgrade to Student')}
           </Button>
 
           <Button
@@ -256,7 +244,7 @@ export const UserUpgradesPage: React.FC = () => {
             onClick={() => setRepModalOpen(true)}
             leftIcon={<ArrowUpRight className="w-4 h-4 text-emerald-500" />}
           >
-            Upgrade to Representative
+            {t('roles.collegeRep', 'Upgrade to Representative')}
           </Button>
         </div>
       </div>
@@ -270,10 +258,10 @@ export const UserUpgradesPage: React.FC = () => {
               <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
                 <GraduationCap className="w-5 h-5" />
               </div>
-              <Badge variant="indigo">Student Program</Badge>
+              <Badge variant="indigo">{t('roles.student', 'Student Program')}</Badge>
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 dark:text-white text-base">University Student Role</h3>
+              <h3 className="font-bold text-slate-900 dark:text-white text-base">{t('roles.student', 'University Student Role')}</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                 Connect your account with your university college to apply for accredited summer training opportunities, submit weekly attendance and progress reports, and receive academic evaluations.
               </p>
@@ -301,7 +289,7 @@ export const UserUpgradesPage: React.FC = () => {
               onClick={() => setStudentModalOpen(true)}
               leftIcon={<GraduationCap className="w-4 h-4 text-indigo-500" />}
             >
-              Apply as Student
+              {t('roles.student', 'Apply as Student')}
             </Button>
           </div>
         </Card>
@@ -313,10 +301,10 @@ export const UserUpgradesPage: React.FC = () => {
               <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-900/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                 <Building2 className="w-5 h-5" />
               </div>
-              <Badge variant="success">Institutional Representative</Badge>
+              <Badge variant="success">{t('roles.companyRep', 'Institutional Representative')}</Badge>
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 dark:text-white text-base">College or Company Representative</h3>
+              <h3 className="font-bold text-slate-900 dark:text-white text-base">{t('roles.collegeRep', 'College or Company Representative')}</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                 Register as an official coordinator for your university college or supervisor for your company to manage trainees, approve summer training requests, and conduct formal student evaluations.
               </p>
@@ -344,7 +332,7 @@ export const UserUpgradesPage: React.FC = () => {
               onClick={() => setRepModalOpen(true)}
               leftIcon={<Shield className="w-4 h-4 text-emerald-500" />}
             >
-              Apply as Representative
+              {t('roles.companyRep', 'Apply as Representative')}
             </Button>
           </div>
         </Card>
@@ -361,18 +349,18 @@ export const UserUpgradesPage: React.FC = () => {
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-                    Latest Request: {activeStatus.requestedRole}
+                    {t('profile.upgradeStatusTitle', 'Latest Request')}: {activeStatus.requestedRole}
                   </h3>
                   <Badge variant={isPending ? 'warning' : activeStatus.status === enRequestStatus.Approved ? 'success' : 'danger'}>
-                    {isPending ? 'Pending Review' : activeStatus.status === enRequestStatus.Approved ? 'Approved' : 'Rejected'}
+                    {isPending ? t('common.pending', 'Pending Review') : activeStatus.status === enRequestStatus.Approved ? t('common.approved', 'Approved') : t('common.rejected', 'Rejected')}
                   </Badge>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Target: {activeStatus.collegeName || activeStatus.companyName || '-'} • Official Email: {activeStatus.officialEmail}
+                  {t('profile.targetEntity', 'Target')}: {activeStatus.collegeName || activeStatus.companyName || '-'} • {t('profile.officialEmail', 'Official Email')}: {activeStatus.officialEmail}
                 </p>
                 {activeStatus.comment && (
                   <p className="text-xs text-amber-700 dark:text-amber-400 font-semibold">
-                    Reviewer Note: {activeStatus.comment}
+                    {t('profile.reviewerNote', 'Reviewer Note')}: {activeStatus.comment}
                   </p>
                 )}
               </div>
@@ -386,7 +374,7 @@ export const UserUpgradesPage: React.FC = () => {
                 onClick={() => setCancelModalOpen(true)}
                 leftIcon={<XCircle className="w-4 h-4" />}
               >
-                Cancel Request
+                {t('profile.cancelRequest', 'Cancel Request')}
               </Button>
             )}
           </div>
@@ -394,12 +382,12 @@ export const UserUpgradesPage: React.FC = () => {
       )}
 
       {/* History Table */}
-      <Card header={<h3 className="text-sm font-bold text-slate-900 dark:text-white">Role Upgrade Application History</h3>}>
-        <Table columns={columns} data={history} keyExtractor={(item) => item.id} isLoading={loading} emptyMessage="No upgrade applications submitted yet." />
+      <Card header={<h3 className="text-sm font-bold text-slate-900 dark:text-white">{t('admin.allRequests', 'Role Upgrade Application History')}</h3>}>
+        <Table columns={columns} data={history} keyExtractor={(item) => item.id} isLoading={loading} emptyMessage={t('common.noData', 'No upgrade applications submitted yet.')} />
       </Card>
 
       {/* Upgrade to Student Modal */}
-      <Modal isOpen={studentModalOpen} onClose={() => setStudentModalOpen(false)} title="Upgrade to Student Role" maxWidth="lg">
+      <Modal isOpen={studentModalOpen} onClose={() => setStudentModalOpen(false)} title={t('roles.student', 'Upgrade to Student Role')} maxWidth="lg">
         <div className="space-y-4">
           <div className="p-3.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 flex items-start gap-3">
             <Info className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
@@ -410,7 +398,7 @@ export const UserUpgradesPage: React.FC = () => {
 
           <form onSubmit={handleStudentSubmit} className="space-y-4">
             <Select
-              label="College"
+              label={t('auth.college', 'College')}
               value={selectedCollegeId}
               onChange={(e) => setSelectedCollegeId(e.target.value)}
               placeholder="Select your college"
@@ -418,7 +406,7 @@ export const UserUpgradesPage: React.FC = () => {
               required
             />
             <Input
-              label="Official Student Email"
+              label={t('admin.officialEmail', 'Official Student Email')}
               type="email"
               placeholder="student@university.edu.sa"
               value={officialEmail}
@@ -427,7 +415,7 @@ export const UserUpgradesPage: React.FC = () => {
             />
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Student ID / Enrollment Proof Document (PDF/IMG)
+                {t('admin.verificationDocCol', 'Student ID / Enrollment Proof Document (PDF/IMG)')}
               </label>
               <input
                 type="file"
@@ -438,10 +426,10 @@ export const UserUpgradesPage: React.FC = () => {
             </div>
             <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
               <Button variant="ghost" onClick={() => setStudentModalOpen(false)}>
-                Cancel
+                {t('common.cancel', 'Cancel')}
               </Button>
               <Button type="submit" isLoading={submitting}>
-                Submit Application
+                {t('common.submit', 'Submit Application')}
               </Button>
             </div>
           </form>
@@ -449,7 +437,7 @@ export const UserUpgradesPage: React.FC = () => {
       </Modal>
 
       {/* Upgrade to Representative Modal */}
-      <Modal isOpen={repModalOpen} onClose={() => setRepModalOpen(false)} title="Upgrade to Representative Role" maxWidth="lg">
+      <Modal isOpen={repModalOpen} onClose={() => setRepModalOpen(false)} title={t('roles.collegeRep', 'Upgrade to Representative Role')} maxWidth="lg">
         <div className="space-y-4">
           <div className="p-3.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/60 flex items-start gap-3">
             <Info className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
@@ -460,7 +448,7 @@ export const UserUpgradesPage: React.FC = () => {
 
           <form onSubmit={handleRepSubmit} className="space-y-4">
             <Select
-              label="Target Representative Role"
+              label={t('admin.requestedRoleCol', 'Target Representative Role')}
               value={targetRole}
               onChange={(e) => setTargetRole(Number(e.target.value) as enRoles)}
               options={[
@@ -470,7 +458,7 @@ export const UserUpgradesPage: React.FC = () => {
             />
             {Number(targetRole) === enRoles.CollegeRep && (
               <Select
-                label="College"
+                label={t('auth.college', 'College')}
                 value={selectedCollegeId}
                 onChange={(e) => setSelectedCollegeId(e.target.value)}
                 placeholder="Select College"
@@ -480,7 +468,7 @@ export const UserUpgradesPage: React.FC = () => {
             )}
             {Number(targetRole) === enRoles.CompanyRep && (
               <Select
-                label="Company"
+                label={t('auth.company', 'Company')}
                 value={selectedCompanyId}
                 onChange={(e) => setSelectedCompanyId(e.target.value)}
                 placeholder="Select Company"
@@ -489,7 +477,7 @@ export const UserUpgradesPage: React.FC = () => {
               />
             )}
             <Input
-              label="Official Work Email"
+              label={t('admin.officialEmail', 'Official Work Email')}
               type="email"
               placeholder="rep@institution.edu.sa"
               value={officialEmail}
@@ -498,7 +486,7 @@ export const UserUpgradesPage: React.FC = () => {
             />
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Employment Proof / Authorization Letter (PDF/IMG)
+                {t('admin.verificationDocCol', 'Employment Proof / Authorization Letter (PDF/IMG)')}
               </label>
               <input
                 type="file"
@@ -509,29 +497,28 @@ export const UserUpgradesPage: React.FC = () => {
             </div>
             <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
               <Button variant="ghost" onClick={() => setRepModalOpen(false)}>
-                Cancel
+                {t('common.cancel', 'Cancel')}
               </Button>
               <Button type="submit" isLoading={submitting}>
-                Submit Application
+                {t('common.submit', 'Submit Application')}
               </Button>
             </div>
           </form>
         </div>
       </Modal>
 
-
       {/* Full Request Details Modal */}
-      <Modal isOpen={detailsModalOpen} onClose={() => setDetailsModalOpen(false)} title="Role Upgrade Application Details" maxWidth="4xl">
+      <Modal isOpen={detailsModalOpen} onClose={() => setDetailsModalOpen(false)} title={t('admin.applicationDetailsTitle', 'Role Upgrade Application Details')} maxWidth="4xl">
         {selectedDetails && (
           <div className="space-y-5">
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-3">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
                 <div>
-                  <p className="text-slate-400 font-medium">Requested Role</p>
+                  <p className="text-slate-400 font-medium">{t('admin.requestedRoleCol', 'Requested Role')}</p>
                   <Badge variant="indigo">{selectedDetails.requestedRole}</Badge>
                 </div>
                 <div>
-                  <p className="text-slate-400 font-medium">Status</p>
+                  <p className="text-slate-400 font-medium">{t('common.status', 'Status')}</p>
                   <Badge
                     variant={
                       selectedDetails.status === enRequestStatus.Approved || (selectedDetails.status as any) === 2 || String(selectedDetails.status).toLowerCase() === 'approved'
@@ -544,35 +531,35 @@ export const UserUpgradesPage: React.FC = () => {
                     }
                   >
                     {selectedDetails.status === enRequestStatus.Approved || (selectedDetails.status as any) === 2 || String(selectedDetails.status).toLowerCase() === 'approved'
-                      ? 'Approved'
+                      ? t('common.approved', 'Approved')
                       : selectedDetails.status === enRequestStatus.Rejected || (selectedDetails.status as any) === 3 || String(selectedDetails.status).toLowerCase() === 'rejected'
-                        ? 'Rejected'
+                        ? t('common.rejected', 'Rejected')
                         : selectedDetails.status === enRequestStatus.Pending || (selectedDetails.status as any) === 1 || String(selectedDetails.status).toLowerCase() === 'pending'
-                          ? 'Pending Review'
-                          : 'Canceled'}
+                          ? t('common.pending', 'Pending Review')
+                          : t('admin.deletedByUser', 'Canceled')}
                   </Badge>
                 </div>
                 <div>
-                  <p className="text-slate-400 font-medium">Submission Date</p>
+                  <p className="text-slate-400 font-medium">{t('admin.submissionDate', 'Submission Date')}</p>
                   <p className="font-semibold text-slate-900 dark:text-white">{new Date(selectedDetails.createdAt).toLocaleDateString()}</p>
                 </div>
                 <div>
-                  <p className="text-slate-400 font-medium">Target Entity</p>
+                  <p className="text-slate-400 font-medium">{t('admin.targetAffiliation', 'Target Entity')}</p>
                   <p className="font-semibold text-slate-900 dark:text-white">{selectedDetails.collegeName || selectedDetails.companyName || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-slate-400 font-medium">Official Email</p>
+                  <p className="text-slate-400 font-medium">{t('admin.officialEmail', 'Official Email')}</p>
                   <p className="font-semibold text-slate-900 dark:text-white">{selectedDetails.officialEmail || '-'}</p>
                 </div>
                 {selectedDetails.reviewedByName && (
                   <div>
-                    <p className="text-slate-400 font-medium">Reviewed By</p>
+                    <p className="text-slate-400 font-medium">{t('admin.reviewedBy', 'Reviewed By')}</p>
                     <p className="font-semibold text-slate-900 dark:text-white">{selectedDetails.reviewedByName}</p>
                   </div>
                 )}
                 {selectedDetails.reviewedAt && (
                   <div>
-                    <p className="text-slate-400 font-medium">Reviewed Date</p>
+                    <p className="text-slate-400 font-medium">{t('admin.reviewedDate', 'Reviewed Date')}</p>
                     <p className="font-semibold text-slate-900 dark:text-white">{new Date(selectedDetails.reviewedAt).toLocaleDateString()}</p>
                   </div>
                 )}
@@ -582,7 +569,7 @@ export const UserUpgradesPage: React.FC = () => {
             {selectedDetails.comment && (
               <div className="p-3.5 rounded-xl border border-amber-200/80 dark:border-amber-900/60 bg-amber-50/60 dark:bg-amber-950/20 space-y-1">
                 <p className="text-xs font-bold text-amber-900 dark:text-amber-300">
-                  Reviewer Feedback / Note
+                  {t('admin.reviewerFeedback', 'Reviewer Feedback / Note')}
                 </p>
                 <p className="text-xs text-amber-800 dark:text-amber-400">{selectedDetails.comment}</p>
               </div>
@@ -592,7 +579,7 @@ export const UserUpgradesPage: React.FC = () => {
               <div className="p-3.5 rounded-xl border border-indigo-200/60 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/20 flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs">
                   <FileText className="w-4 h-4 text-indigo-600" />
-                  <span className="font-semibold text-slate-900 dark:text-white">Uploaded Proof Document Attached</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">{t('admin.docAttached', 'Uploaded Proof Document Attached')}</span>
                 </div>
                 <Button
                   variant="outline"
@@ -600,14 +587,14 @@ export const UserUpgradesPage: React.FC = () => {
                   onClick={() => handleOpenProofViewer(selectedDetails.id, selectedDetails.requestedRole)}
                   leftIcon={<Eye className="w-3.5 h-3.5 text-indigo-500" />}
                 >
-                  View Document
+                  {t('admin.viewDocBtn', 'View Document')}
                 </Button>
               </div>
             )}
 
             <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
               <Button variant="ghost" onClick={() => setDetailsModalOpen(false)}>
-                Close
+                {t('common.close', 'Close')}
               </Button>
               {(selectedDetails.status === enRequestStatus.Pending || (selectedDetails.status as any) === 1 || String(selectedDetails.status).toLowerCase() === 'pending') && (
                 <Button
@@ -618,7 +605,7 @@ export const UserUpgradesPage: React.FC = () => {
                   }}
                   leftIcon={<XCircle className="w-4 h-4" />}
                 >
-                  Cancel Request
+                  {t('profile.cancelRequest', 'Cancel Request')}
                 </Button>
               )}
             </div>
@@ -634,7 +621,7 @@ export const UserUpgradesPage: React.FC = () => {
             setFileViewerOpen(false);
             setViewingProofId(null);
           }}
-          title="Uploaded Proof Document Preview"
+          title={t('admin.docAttached', 'Uploaded Proof Document Preview')}
           fileName={viewingProofName}
           fetchBlob={() => userService.getProofFileBlob(viewingProofId)}
         />
@@ -645,9 +632,9 @@ export const UserUpgradesPage: React.FC = () => {
         isOpen={cancelModalOpen}
         onClose={() => setCancelModalOpen(false)}
         onConfirm={handleConfirmCancel}
-        title="Cancel Upgrade Request"
+        title={t('profile.cancelRequest', 'Cancel Upgrade Request')}
         message="Are you sure you want to cancel your pending role upgrade request?"
-        confirmText="Cancel Request"
+        confirmText={t('profile.cancelRequest', 'Cancel Request')}
         variant="danger"
         isLoading={submitting}
       />

@@ -38,15 +38,17 @@ export const PublicCompaniesPage: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Training Companies Directory</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+            {t('nav.publicCompanies', 'Training Companies Directory')}
+          </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Browse registered training providers offering summer internship programs
+            {t('admin.companiesSubtitle', 'Browse registered training providers offering summer internship programs')}
           </p>
         </div>
 
         <div className="w-full sm:w-72">
           <Input
-            placeholder="Search company by name or location..."
+            placeholder={t('admin.searchCompaniesPlaceholder', 'Search company by name or location...')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             leftIcon={<Search className="w-4 h-4" />}
@@ -65,7 +67,9 @@ export const PublicCompaniesPage: React.FC = () => {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <Card className="p-8 text-center text-slate-400 text-xs">No companies found matching search criteria.</Card>
+        <Card className="p-8 text-center text-slate-400 text-xs">
+          {t('common.noData', 'No companies found matching search criteria.')}
+        </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filtered.map((company) => (
@@ -80,14 +84,14 @@ export const PublicCompaniesPage: React.FC = () => {
                 <h3 className="font-bold text-base text-slate-900 dark:text-white">{company.name}</h3>
                 <div className="flex items-center gap-1 text-xs text-slate-400 mt-1">
                   <MapPin className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">{company.address || 'Headquarters'}</span>
+                  <span className="truncate">{company.address || t('admin.noHeadquartersSpecified', 'Headquarters')}</span>
                 </div>
               </div>
 
               <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
                 <div className="flex items-center gap-1">
                   <Users className="w-4 h-4 text-emerald-500" />
-                  <span>{company.totalStudents ?? 0} Active Trainees</span>
+                  <span>{t('admin.traineesCount', { count: company.totalStudents ?? 0 })}</span>
                 </div>
               </div>
             </Card>

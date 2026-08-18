@@ -66,7 +66,7 @@ export const CollegeProfilePage: React.FC = () => {
     e.preventDefault();
 
     if (!name.trim()) {
-      toast.error('College name is required');
+      toast.error(t('college.collegeNameLabel', 'College name is required'));
       return;
     }
 
@@ -79,15 +79,10 @@ export const CollegeProfilePage: React.FC = () => {
       };
 
       await collegeService.updateCollegeProfile(dto);
-      toast.success('College information updated successfully');
+      toast.success(t('common.save', 'College information updated successfully'));
       fetchData();
     } catch (err: any) {
       console.error('Failed to update college:', err);
-      const msg =
-        err.response?.data?.devMessage ||
-        err.response?.data?.message ||
-        'Failed to save changes. Please try again.';
-      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -114,10 +109,10 @@ export const CollegeProfilePage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-            {t('nav.collegeProfile', 'College Information Management')}
+            {t('college.profileTitle', 'College Profile & Information')}
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Update institutional details, official contact channels, and view active enrollment metrics
+            {t('college.profileSubtitle', 'Update official institutional details, contact channels, and view active student enrollment metrics')}
           </p>
         </div>
 
@@ -128,7 +123,7 @@ export const CollegeProfilePage: React.FC = () => {
           isLoading={loading}
           leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />}
         >
-          Refresh Data
+          {t('common.refresh', 'Refresh Data')}
         </Button>
       </div>
 
@@ -145,11 +140,11 @@ export const CollegeProfilePage: React.FC = () => {
             <div className="space-y-1">
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight">
-                  {profile?.name || 'College Management'}
+                  {profile?.name || t('college.collegeHeroTitle', 'College Summer Training Administration')}
                 </h2>
                 <Badge variant="indigo" size="sm" className="bg-indigo-500/20 border-indigo-400/30 text-indigo-200">
                   <ShieldCheck className="w-3 h-3 mr-1" />
-                  College Representative
+                  {t('college.collegeRepBadge', 'College Representative')}
                 </Badge>
               </div>
               <p className="text-xs text-indigo-200/80 flex items-center gap-1.5">
@@ -162,12 +157,12 @@ export const CollegeProfilePage: React.FC = () => {
           {/* Quick Metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 shrink-0">
             <div className="p-3 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 text-center">
-              <p className="text-[10px] uppercase font-semibold text-indigo-200/70">Enrolled Students</p>
+              <p className="text-[10px] uppercase font-semibold text-indigo-200/70">{t('college.studentsSummary', 'Enrolled Students')}</p>
               <p className="text-lg font-bold text-white mt-0.5">{profile?.totalStudents ?? 0}</p>
             </div>
 
             <div className="p-3 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 text-center">
-              <p className="text-[10px] uppercase font-semibold text-indigo-200/70">Guidelines Docs</p>
+              <p className="text-[10px] uppercase font-semibold text-indigo-200/70">{t('college.guidelinesSummary', 'Guidelines')}</p>
               <p className="text-lg font-bold text-white mt-0.5">{documents.length}</p>
             </div>
 
@@ -188,7 +183,7 @@ export const CollegeProfilePage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-indigo-500" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Edit College Information</h3>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">{t('admin.editCollegeTitle', 'Edit College Information')}</h3>
               </div>
               {isFormDirty && (
                 <Badge variant="warning" size="sm">
@@ -201,7 +196,7 @@ export const CollegeProfilePage: React.FC = () => {
           <form onSubmit={handleSaveChanges} className="space-y-5">
             <div className="space-y-4">
               <Input
-                label="College Name *"
+                label={t('college.collegeNameLabel', 'College Name *')}
                 placeholder="e.g. College of Computer & Information Sciences"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -211,7 +206,7 @@ export const CollegeProfilePage: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
-                  label="Official Contact Email"
+                  label={t('college.contactEmailLabel', 'Official Contact Email')}
                   type="email"
                   placeholder="e.g. ccsit-training@university.edu.sa"
                   value={contactEmail}
@@ -221,7 +216,7 @@ export const CollegeProfilePage: React.FC = () => {
                 />
 
                 <Input
-                  label="Campus Address / Building"
+                  label={t('college.campusAddressLabel', 'Campus Address / Building')}
                   placeholder="e.g. Building 31, Main Campus, Riyadh"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
@@ -245,7 +240,7 @@ export const CollegeProfilePage: React.FC = () => {
                 onClick={handleReset}
                 disabled={!isFormDirty || saving}
               >
-                Reset
+                {t('common.cancel', 'Reset')}
               </Button>
               <Button
                 type="submit"
@@ -253,7 +248,7 @@ export const CollegeProfilePage: React.FC = () => {
                 leftIcon={<Save className="w-4 h-4" />}
                 className="shadow-indigo-600/20 shadow-md"
               >
-                Save College Information
+                {t('college.saveCollegeInfoBtn', 'Save College Information')}
               </Button>
             </div>
           </form>
@@ -265,7 +260,7 @@ export const CollegeProfilePage: React.FC = () => {
             header={
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-indigo-500" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Training Guidelines & Docs</h3>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">{t('college.guidelinesSummary', 'Training Guidelines & Docs')}</h3>
               </div>
             }
           >
@@ -305,13 +300,13 @@ export const CollegeProfilePage: React.FC = () => {
             header={
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4 text-indigo-500" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Student Enrollment</h3>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">{t('college.studentsSummary', 'Student Enrollment')}</h3>
               </div>
             }
           >
             <div className="space-y-3 text-xs text-slate-500 dark:text-slate-400">
               <div className="flex items-center justify-between p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/40">
-                <span className="font-medium text-slate-700 dark:text-slate-300">Active Students</span>
+                <span className="font-medium text-slate-700 dark:text-slate-300">{t('college.studentsSummary', 'Active Students')}</span>
                 <span className="text-base font-extrabold text-indigo-600 dark:text-indigo-400">
                   {profile?.totalStudents ?? 0}
                 </span>

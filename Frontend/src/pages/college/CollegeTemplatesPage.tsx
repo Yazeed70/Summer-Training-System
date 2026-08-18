@@ -16,13 +16,8 @@ import {
   Users2,
   FileCheck2,
   Search,
-  Filter,
-  AlertCircle,
   FileText,
-  HelpCircle,
-  Star,
   RefreshCw,
-  Sparkles,
 } from 'lucide-react';
 import { reportsService } from '../../api/reportsService';
 import {
@@ -34,6 +29,7 @@ import { enEvaluationPhase, enQuestionType } from '../../types/enums';
 import { Table, Column } from '../../components/ui/Table';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { ConfirmModal } from '../../components/ui/ConfirmModal';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
@@ -56,6 +52,11 @@ export const CollegeTemplatesPage: React.FC = () => {
   const [quickSettingsModalOpen, setQuickSettingsModalOpen] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
+  // Delete Confirm Modal State
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [targetDeleteId, setTargetDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   const [activeTemplateDetails, setActiveTemplateDetails] = useState<TemplateDetailsDto | null>(null);
   const [quickSettingsTemplate, setQuickSettingsTemplate] = useState<CollegeReportTemplateDto | null>(null);
   const [quickDueDate, setQuickDueDate] = useState('');
@@ -65,13 +66,12 @@ export const CollegeTemplatesPage: React.FC = () => {
   const [quickDescription, setQuickDescription] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
-  const [loadingDetails, setLoadingDetails] = useState(false);
 
   const fetchTemplates = async () => {
     try {
       setLoading(true);
       const res = await reportsService.getCollegeTemplates();
-      setTemplates(res);
+      setTemplates(res || []);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load college report templates.');
@@ -93,9 +93,7 @@ export const CollegeTemplatesPage: React.FC = () => {
       setCreateModalOpen(false);
       fetchTemplates();
     } catch (err: any) {
-      console.error(err);
-      const msg = err.response?.data?.devMessage || err.response?.data?.message || 'Failed to create report template.';
-      toast.error(msg);
+      console.error('Failed to create report template:', err);
     } finally {
       setSubmitting(false);
     }
@@ -104,15 +102,11 @@ export const CollegeTemplatesPage: React.FC = () => {
   // Handle Open Edit Modal
   const handleOpenEdit = async (templatePublicId: string) => {
     try {
-      setLoadingDetails(true);
       const details = await reportsService.getTemplateDetails(templatePublicId);
       setActiveTemplateDetails(details);
       setEditModalOpen(true);
     } catch (err: any) {
-      console.error(err);
-      toast.error('Failed to load template details for editing.');
-    } finally {
-      setLoadingDetails(false);
+      console.error('Failed to load template details:', err);
     }
   };
 
@@ -127,9 +121,7 @@ export const CollegeTemplatesPage: React.FC = () => {
       setActiveTemplateDetails(null);
       fetchTemplates();
     } catch (err: any) {
-      console.error(err);
-      const msg = err.response?.data?.devMessage || err.response?.data?.message || 'Failed to update report template.';
-      toast.error(msg);
+      console.error('Failed to update report template:', err);
     } finally {
       setSubmitting(false);
     }
@@ -187,7 +179,7 @@ export const CollegeTemplatesPage: React.FC = () => {
         isAvailable: quickIsAvailable,
         requiresCollegeEvaluation: requiresCollege,
         requiresCompanyEvaluation: requiresCompany,
-        questions: [], // No question changes in quick settings
+        questions: [],
       });
 
       toast.success('Template settings updated');
@@ -195,9 +187,7 @@ export const CollegeTemplatesPage: React.FC = () => {
       setQuickSettingsTemplate(null);
       fetchTemplates();
     } catch (err: any) {
-      console.error(err);
-      const msg = err.response?.data?.devMessage || err.response?.data?.message || 'Failed to update settings.';
-      toast.error(msg);
+      console.error('Failed to update quick settings:', err);
     } finally {
       setSubmitting(false);
     }
@@ -206,47 +196,47 @@ export const CollegeTemplatesPage: React.FC = () => {
   // Handle Open Preview Modal
   const handleOpenPreview = async (templatePublicId: string) => {
     try {
-      setLoadingDetails(true);
       const details = await reportsService.getTemplateDetails(templatePublicId);
       setActiveTemplateDetails(details);
       setPreviewModalOpen(true);
     } catch (err: any) {
-      console.error(err);
-      toast.error('Failed to load template preview.');
-    } finally {
-      setLoadingDetails(false);
+      console.error('Failed to load template preview:', err);
     }
   };
 
-  // Handle Delete Template
-  const handleDelete = async (publicId: string) => {
-    if (!window.confirm('Are you sure you want to delete this report template? This action cannot be undone.')) return;
+  // Handle Open Delete Modal
+  const handleOpenDeleteConfirm = (publicId: string) => {
+    setTargetDeleteId(publicId);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!targetDeleteId) return;
     try {
-      await reportsService.deleteTemplate(publicId);
+      setDeleting(true);
+      await reportsService.deleteTemplate(targetDeleteId);
       toast.success('Template deleted successfully');
+      setDeleteConfirmOpen(false);
       fetchTemplates();
     } catch (err: any) {
-      console.error(err);
-      const msg = err.response?.data?.devMessage || err.response?.data?.message || 'Failed to delete template. Templates with existing student reports cannot be deleted.';
-      toast.error(msg);
+      console.error('Failed to delete template:', err);
+    } finally {
+      setDeleting(false);
     }
   };
 
   // Filtered Templates
   const filteredTemplates = useMemo(() => {
     return templates.filter((item) => {
-      // Search
       const matchesSearch =
         item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (item.description && item.description.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      // Status
       const matchesStatus =
         statusFilter === 'all' ||
         (statusFilter === 'active' && item.isAvailable) ||
         (statusFilter === 'draft' && !item.isAvailable);
 
-      // Evaluators
       let matchesEvaluator = true;
       if (evaluatorFilter === 'college') {
         matchesEvaluator = item.requiresCollegeEvaluation && !item.requiresCompanyEvaluation;
@@ -286,7 +276,7 @@ export const CollegeTemplatesPage: React.FC = () => {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800">
           <Users2 className="w-3 h-3" />
-          <span>Both (College & Company)</span>
+          <span>{t('college.bothEvaluators', 'Both (College & Company)')}</span>
         </span>
       );
     }
@@ -294,7 +284,7 @@ export const CollegeTemplatesPage: React.FC = () => {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800">
           <GraduationCap className="w-3 h-3" />
-          <span>College Supervisor Only</span>
+          <span>{t('college.collegeOnly', 'College Supervisor Only')}</span>
         </span>
       );
     }
@@ -302,7 +292,7 @@ export const CollegeTemplatesPage: React.FC = () => {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800">
           <Building2 className="w-3 h-3" />
-          <span>Company Supervisor Only</span>
+          <span>{t('college.companyOnly', 'Company Supervisor Only')}</span>
         </span>
       );
     }
@@ -387,10 +377,10 @@ export const CollegeTemplatesPage: React.FC = () => {
       cell: (item) => renderEvaluatorBadge(item),
     },
     {
-      header: 'Status',
+      header: t('common.status', 'Status'),
       cell: (item) => (
         <Badge variant={item.isAvailable ? 'success' : 'neutral'} size="sm">
-          {item.isAvailable ? 'Active / Published' : 'Draft / Inactive'}
+          {item.isAvailable ? t('college.activeTemplates', 'Active') : 'Draft'}
         </Badge>
       ),
     },
@@ -410,7 +400,7 @@ export const CollegeTemplatesPage: React.FC = () => {
       ),
     },
     {
-      header: t('common.actions'),
+      header: t('common.actions', 'Actions'),
       cell: (item) => (
         <div className="flex items-center gap-1">
           <Button
@@ -427,7 +417,7 @@ export const CollegeTemplatesPage: React.FC = () => {
             variant="ghost"
             size="sm"
             onClick={() => handleOpenQuickSettings(item)}
-            title="Quick Settings (Due Date, Evaluators, Status)"
+            title="Quick Settings"
             className="p-1.5 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950"
           >
             <Settings className="w-4 h-4" />
@@ -437,7 +427,7 @@ export const CollegeTemplatesPage: React.FC = () => {
             variant="ghost"
             size="sm"
             onClick={() => handleOpenPreview(item.templatePublicId)}
-            title="Preview Student Form"
+            title="Preview Form"
             className="p-1.5 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950"
           >
             <Eye className="w-4 h-4" />
@@ -446,7 +436,7 @@ export const CollegeTemplatesPage: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handleDelete(item.templatePublicId)}
+            onClick={() => handleOpenDeleteConfirm(item.templatePublicId)}
             title="Delete Template"
             className="p-1.5 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950"
           >
@@ -462,11 +452,11 @@ export const CollegeTemplatesPage: React.FC = () => {
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <span>{t('nav.reportTemplates')}</span>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+            {t('college.templatesTitle', 'Academic Evaluation Templates Hub')}
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Configure dynamic evaluation forms, due dates, evaluator workflows, and publish questionnaires to students.
+            {t('college.templatesSubtitle', 'Build dynamic evaluation questionnaires, set due dates, configure evaluator workflows, and publish to students')}
           </p>
         </div>
 
@@ -475,15 +465,16 @@ export const CollegeTemplatesPage: React.FC = () => {
             variant="outline"
             size="sm"
             onClick={fetchTemplates}
+            isLoading={loading}
             leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />}
           >
-            Refresh
+            {t('common.refresh', 'Refresh')}
           </Button>
           <Button
             onClick={() => setCreateModalOpen(true)}
             leftIcon={<Plus className="w-4 h-4" />}
           >
-            Create New Template
+            {t('college.createTemplateBtn', '+ Create New Template')}
           </Button>
         </div>
       </div>
@@ -492,20 +483,20 @@ export const CollegeTemplatesPage: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-4 bg-gradient-to-br from-indigo-50/50 to-white dark:from-slate-900 dark:to-slate-800 border-indigo-100 dark:border-slate-800">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Total Templates</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('college.totalTemplates', 'Total Templates')}</span>
             <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400">
               <FileSpreadsheet className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-bold text-slate-900 dark:text-white">{stats.total}</span>
-            <span className="text-xs text-slate-400">forms configured</span>
+            <span className="text-xs text-slate-400">forms</span>
           </div>
         </Card>
 
         <Card className="p-4 bg-gradient-to-br from-emerald-50/50 to-white dark:from-slate-900 dark:to-slate-800 border-emerald-100 dark:border-slate-800">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Active & Published</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('college.activeTemplates', 'Active & Published')}</span>
             <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="w-4 h-4" />
             </div>
@@ -518,7 +509,7 @@ export const CollegeTemplatesPage: React.FC = () => {
 
         <Card className="p-4 bg-gradient-to-br from-amber-50/50 to-white dark:from-slate-900 dark:to-slate-800 border-amber-100 dark:border-slate-800">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Due Soon (≤ 5 Days)</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('college.dueSoonTemplates', 'Due Soon (≤ 5 Days)')}</span>
             <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400">
               <Clock className="w-4 h-4" />
             </div>
@@ -531,7 +522,7 @@ export const CollegeTemplatesPage: React.FC = () => {
 
         <Card className="p-4 bg-gradient-to-br from-sky-50/50 to-white dark:from-slate-900 dark:to-slate-800 border-sky-100 dark:border-slate-800">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Student Responses</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('college.totalResponses', 'Student Responses')}</span>
             <div className="p-2 rounded-xl bg-sky-100 dark:bg-sky-950/80 text-sky-600 dark:text-sky-400">
               <Users2 className="w-4 h-4" />
             </div>
@@ -547,7 +538,7 @@ export const CollegeTemplatesPage: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
         <div className="flex-1 max-w-md">
           <Input
-            placeholder="Search templates by title or instructions..."
+            placeholder={t('college.searchTemplatesPlaceholder', 'Search templates by title or instructions...')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             leftIcon={<Search className="w-4 h-4 text-slate-400" />}
@@ -560,8 +551,8 @@ export const CollegeTemplatesPage: React.FC = () => {
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
             options={[
-              { value: 'all', label: 'All Statuses' },
-              { value: 'active', label: 'Active / Published' },
+              { value: 'all', label: t('admin.allRequests', 'All Statuses') },
+              { value: 'active', label: t('college.activeTemplates', 'Active / Published') },
               { value: 'draft', label: 'Draft / Inactive' },
             ]}
           />
@@ -571,10 +562,10 @@ export const CollegeTemplatesPage: React.FC = () => {
             value={evaluatorFilter}
             onChange={(e) => setEvaluatorFilter(e.target.value as any)}
             options={[
-              { value: 'all', label: 'All Evaluators' },
-              { value: 'college', label: 'College Only' },
-              { value: 'company', label: 'Company Only' },
-              { value: 'both', label: 'Both Supervisors' },
+              { value: 'all', label: t('college.allEvaluators', 'All Evaluators') },
+              { value: 'college', label: t('college.collegeOnly', 'College Only') },
+              { value: 'company', label: t('college.companyOnly', 'Company Only') },
+              { value: 'both', label: t('college.bothEvaluators', 'Both Supervisors') },
               { value: 'none', label: 'Self-Report / None' },
             ]}
           />
@@ -587,14 +578,14 @@ export const CollegeTemplatesPage: React.FC = () => {
         data={filteredTemplates}
         keyExtractor={(item) => item.templatePublicId}
         isLoading={loading}
-        emptyMessage="No college report templates match your search or filter criteria."
+        emptyMessage={t('common.noData', 'No college report templates match your search or filter criteria.')}
       />
 
       {/* MODAL 1: Create New Template */}
       <Modal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
-        title="Create New College Report Template"
+        title={t('college.createTemplateBtn', 'Create New College Report Template')}
         maxWidth="2xl"
       >
         <ReportTemplateBuilder
@@ -724,10 +715,10 @@ export const CollegeTemplatesPage: React.FC = () => {
                   setQuickSettingsTemplate(null);
                 }}
               >
-                Cancel
+                {t('common.cancel', 'Cancel')}
               </Button>
               <Button onClick={handleSaveQuickSettings} isLoading={submitting}>
-                Save Settings
+                {t('common.save', 'Save Settings')}
               </Button>
             </div>
           </div>
@@ -746,7 +737,6 @@ export const CollegeTemplatesPage: React.FC = () => {
       >
         {activeTemplateDetails && (
           <div className="space-y-5">
-            {/* Header info */}
             <div className="p-4 rounded-xl border border-indigo-100 dark:border-indigo-950/60 bg-indigo-50/40 dark:bg-indigo-950/30 space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
@@ -774,7 +764,6 @@ export const CollegeTemplatesPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Questions List */}
             <div className="space-y-4">
               <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                 Questionnaire Fields ({activeTemplateDetails.questions.length})
@@ -795,7 +784,6 @@ export const CollegeTemplatesPage: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* Options render if multiple choice or dropdown */}
                   {(q.questionType === enQuestionType.MultipleChoice || q.questionType === enQuestionType.Dropdown) && (
                     <div className="pl-3 space-y-1">
                       {((q.options && q.options.length > 0) ? q.options : (q.optionsPayload ? JSON.parse(q.optionsPayload) : [])).map((opt: string, oIdx: number) => (
@@ -810,14 +798,26 @@ export const CollegeTemplatesPage: React.FC = () => {
               ))}
             </div>
 
-            <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
-              <Button variant="outline" onClick={() => setPreviewModalOpen(false)}>
-                Close Preview
+            <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-800">
+              <Button variant="ghost" onClick={() => setPreviewModalOpen(false)}>
+                {t('common.close', 'Close Preview')}
               </Button>
             </div>
           </div>
         )}
       </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title={t('common.delete', 'Delete Report Template')}
+        message="Are you sure you want to delete this report template? This action cannot be undone."
+        confirmText={t('common.delete', 'Delete Template')}
+        variant="danger"
+        isLoading={deleting}
+      />
     </div>
   );
 };

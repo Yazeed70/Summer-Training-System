@@ -72,6 +72,7 @@ export const DashboardLayout: React.FC = () => {
       case enRoles.CompanyRep:
         return [
           { to: '/company', label: t('nav.dashboard'), icon: LayoutDashboard, end: true },
+          { to: '/company/profile', label: t('nav.companyProfile', 'Company Profile'), icon: Building },
           { to: '/company/trainees', label: t('nav.traineeRoster'), icon: Users },
           { to: '/company/templates', label: t('nav.reportTemplates'), icon: FileSpreadsheet },
           { to: '/company/evaluations', label: t('nav.reportSubmissions'), icon: FileText },
@@ -230,8 +231,9 @@ export const DashboardLayout: React.FC = () => {
 
         {/* Sidebar */}
         <aside
-          className={`fixed lg:static inset-y-0 left-0 rtl:right-0 rtl:left-auto z-40 w-64 bg-white dark:bg-slate-900 border-r rtl:border-l border-slate-200/80 dark:border-slate-800 flex flex-col justify-between transition-transform duration-200 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full lg:translate-x-0'
-            }`}
+          className={`fixed lg:static inset-y-0 start-0 z-40 w-64 bg-white dark:bg-slate-900 border-e border-slate-200/80 dark:border-slate-800 flex flex-col justify-between transition-transform duration-200 ease-in-out ${
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full lg:translate-x-0 lg:rtl:translate-x-0'
+          }`}
         >
           <div className="p-4 space-y-6">
             <div className="flex items-center justify-between lg:hidden">

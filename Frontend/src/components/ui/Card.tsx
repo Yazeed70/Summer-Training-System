@@ -7,11 +7,13 @@ export interface CardProps {
   className?: string;
   header?: React.ReactNode;
   footer?: React.ReactNode;
+  onClick?: () => void;
 }
 
-export const Card: React.FC<CardProps> = ({ children, className, header, footer }) => {
+export const Card: React.FC<CardProps> = ({ children, className, header, footer, onClick }) => {
   return (
     <div
+      onClick={onClick}
       className={twMerge(
         clsx(
           'rounded-xl border bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden transition-all duration-200',

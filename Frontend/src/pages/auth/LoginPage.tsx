@@ -65,16 +65,16 @@ export const LoginPage: React.FC = () => {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <Input
-          label="Username"
+          label={t('auth.username', 'Username')}
           type="text"
-          placeholder="e.g. jdoe or student_user"
+          placeholder={t('auth.usernamePlaceholder', 'e.g. jdoe or student_user')}
           leftIcon={<User className="w-4 h-4" />}
           error={errors.username?.message}
           {...register('username')}
         />
 
         <Input
-          label={t('auth.password')}
+          label={t('auth.password', 'Password')}
           type="password"
           placeholder="••••••••"
           leftIcon={<Lock className="w-4 h-4" />}

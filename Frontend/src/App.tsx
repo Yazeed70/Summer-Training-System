@@ -5,6 +5,8 @@ import { Toaster } from 'sonner';
 import { router } from './router';
 import './i18n';
 
+import { GlobalErrorModal } from './components/ui/GlobalErrorModal';
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -19,6 +21,7 @@ export const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
+      <GlobalErrorModal />
       <Toaster position="top-right" richColors closeButton />
     </QueryClientProvider>
   );

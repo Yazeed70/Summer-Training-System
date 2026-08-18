@@ -155,10 +155,6 @@ export interface CreateCompanyDto {
   name: string;
   contactEmail?: string;
   address: string;
-  industry?: string;
-  website?: string;
-  city?: string;
-  contactPhone?: string;
 }
 
 export interface CompaniesListDto {
@@ -175,17 +171,12 @@ export interface CompanyDetailsDto {
   name: string;
   contactEmail?: string;
   address: string;
-  industry?: string;
-  website?: string;
-  city?: string;
-  contactPhone?: string;
   isApproved: boolean;
   isActive: boolean;
   createdAt?: string;
   createdByUserName?: string;
   approvedAt?: string;
   totalStudents: number;
-  totalTrainees?: number;
 }
 
 export interface PendingCompanyRequestDto {
@@ -224,7 +215,8 @@ export interface UpgradeRequestsListDto {
   requestedRole: string;
   companyName?: string;
   collegeName?: string;
-  proofFilePath: string;
+  proofFilePath?: string;
+  filePath?: string;
   status: enRequestStatus;
   createdAt?: string;
 }
@@ -245,6 +237,9 @@ export interface CreateTrainingRecordDto {
   studentPublicId: string;
   startDate?: string;
   endDate?: string;
+  academicYear?: string;
+  semester?: enSemesterType | number;
+  status?: enTrainingStatus | number;
   notes?: string;
 }
 

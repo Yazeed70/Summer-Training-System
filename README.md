@@ -12,7 +12,7 @@ This system provides a unified, role-driven platform that orchestrates the entir
 - **Registration & Role Verification**: Users register and submit verification proofs to be onboarded as students, college representatives, or company supervisors.
 - **Training Request Lifecycle**: Students apply for training opportunities with host companies, submit acceptance letters, and obtain formal college review and approval.
 - **Field & Academic Progress Tracking**: Active internships are tracked with structured status milestones (Not Started, Active, Completed, Terminated, Failed).
-- **Dynamic Periodic Reporting & Dual-Phase Evaluation**: Academic and company supervisors can create customized evaluation templates with dynamic question types. Students submit periodic reports, which are then independently reviewed and evaluated by company mentors and college coordinators.
+- **Dynamic Periodic Reporting & Dual-Phase Evaluation**: Academic and company supervisors can create customized evaluation templates with dynamic question types. Students submit periodic reports, review their submissions, and evaluators inspect responses with in-browser document preview before submitting scores.
 - **Administrative Governance**: Super administrators manage the system's institutional registry (colleges, companies, representatives), audit role requests, and supervise program statistics.
 
 ---
@@ -30,12 +30,13 @@ This system provides a unified, role-driven platform that orchestrates the entir
 - **Training Record Tracking**: Automatic generation of `TrainingRecord` entities upon approval, tracking training status (`NotStarted`, `Active`, `Completed`, `Terminated`, `Failed`).
 
 ### Dynamic Reporting & Multi-Phase Evaluations
-- **Dynamic Template Builder**: College and company representatives can construct customized report templates featuring multiple question formats (e.g., text, multiple-choice with JSON options payload, required flags, and display ordering).
-- **Periodic Student Submissions**: Enrolled students fill out and submit assigned reports with answers and optional file attachments.
-- **Two-Phase Supervisor Evaluations**: Independent evaluation scoring (`Poor`, `Fair`, `Good`, `VeryGood`, `Excellent`) and feedback comments by both company supervisors (`CompanyEvaluation`) and academic advisors (`CollegeEvaluation`).
+- **Dynamic Template Builder**: College and company representatives construct customized report templates featuring multiple question formats (Text, Multiple-Choice, Dropdowns, Star Rating Scales, Dates, Times, Booleans, and File Uploads).
+- **Periodic Student Submissions & Review**: Enrolled students fill out and submit assigned reports. Students can inspect their submitted answers in read-only mode and delete unreviewed submissions if they need to re-fill and re-submit.
+- **Integrated Supervisor Evaluation**: Company supervisors (`CompanyEvaluation`) and college academic advisors (`CollegeEvaluation`) inspect student answers and attachments in an all-in-one review & evaluate modal before recording scores (`Poor`, `Fair`, `Good`, `VeryGood`, `Excellent`) and feedback remarks.
 
 ### Document & File Management
 - **Secure File Storage**: Dedicated service managing acceptance letters, role upgrade proofs, college guidelines, and report attachments.
+- **In-Browser Document Preview**: Built-in modal viewer allowing users and supervisors to preview uploaded PDFs and images directly inside the application without mandatory downloads.
 - **Security Validations**: Strict MIME/extension validation (`.pdf`, `.png`, `.jpg`, `.jpeg`, `.doc`, `.docx`, `.xls`, `.xlsx`), 10 MB file size cap, GUID-based file renaming to prevent collisions, and directory traversal defense.
 
 ### Multi-Role Dashboards & Administration
@@ -59,20 +60,21 @@ This system provides a unified, role-driven platform that orchestrates the entir
 | **State & Data Fetching** | TanStack Query v5 + Zustand | Server state synchronization and client state management |
 | **Styling & Icons** | Tailwind CSS v4 + Lucide React | Modern utility-first styling and icon system |
 | **Forms & Validation** | React Hook Form + Zod | Schema-driven form handling and validation |
-| **Internationalization** | i18next + react-i18next | Multi-language localization support |
+| **Internationalization** | i18next + react-i18next | Multi-language localization support (Arabic & English) |
 | **Notifications** | Sonner | Toast notification management |
 
 ---
 
 ## Backend Architecture
 
-The backend is built following a clean, layered architectural structure emphasizing separation of concerns, maintainability, and domain-driven design principles:
+The backend is built following a clean, layered architecture emphasizing separation of concerns, maintainability, and clean code best practices:
 
 ```
 Backend/
 ├── Common/
 │   ├── Constants/            # Centralized domain ErrorCodes and FileSettings
-│   └── Middleware/           # Global exception handling middleware
+│   ├── Exceptions/           # GlobalExceptionHandler implementing IExceptionHandler
+│   └── Results/              # Result Pattern (Result, Result<T>, Error, ErrorType)
 ├── Controllers/              # ASP.NET Core API Controllers (Route handlers & HTTP mapping)
 │   ├── Auth/                 # Authentication & profile endpoints
 │   ├── Dashboard/            # Role-specific dashboard controllers (Admin, College, Company, Student, User)
@@ -90,11 +92,11 @@ Backend/
 │   ├── Reports/
 │   ├── Shared/
 │   └── Training/
-├── Entities/                 # Core Domain Models and Enums
+├── Entities/                 # Domain Models and Enums
 │   ├── Core/                 # User, StudentProfile, College, Company, TrainingRecord, etc.
 │   ├── Enums/                # enRoles, enTrainingStatus, enReportStatus, enEvaluationScore, etc.
 │   └── Reports/              # ReportTemplate, ReportQuestion, StudentReport, ReportEvaluation, etc.
-├── Extensions/               # Helper extensions (ClaimsPrincipalExtensions for claim extraction)
+├── Extensions/               # Helper extensions (ClaimsPrincipalExtensions, ControllerExtensions)
 ├── Migrations/               # Entity Framework Core schema migrations
 ├── Services/
 │   ├── Interfaces/           # Abstraction layer for business logic
@@ -103,12 +105,14 @@ Backend/
 └── Program.cs                # Application bootstrap, DI configuration, and HTTP pipeline
 ```
 
-### Architectural Decisions
-1. **Separation of Concerns**: Controllers remain lightweight and delegate all business logic, authorization verification, and data transformations to dedicated Scoped Services (`IAuthService`, `ITrainingService`, `IReportsService`, `IAdminDashboardService`, etc.).
-2. **Standardized Error Handling**: A custom `GlobalExceptionHandlerMiddleware` catches unhandled exceptions, logs them with `ILogger`, and returns standardized `ApiErrorResponseDTO` payloads with consistent HTTP status codes.
-3. **Domain Error Model**: Business failures return standardized error objects referencing strongly-typed constant error codes (`ErrorCodes`) rather than leaking raw database or system exceptions.
-4. **Dual Identifier Pattern**: Entities utilize auto-incrementing integer Primary Keys (`Id`) for efficient internal joins and database indexing, while exposing a unique GUID (`PublicId`) for all external API endpoints to prevent sequential ID enumeration attacks.
-5. **Transactional Integrity**: Multi-entity workflows (such as creating a report template with dynamic questions) utilize EF Core execution strategies (`CreateExecutionStrategy`) and explicit database transactions (`BeginTransactionAsync`) to ensure ACID compliance.
+### Architectural & Design Decisions
+
+1. **Separation of Concerns**: Controllers act as lightweight HTTP adapters. They validate inputs and delegate business rules, data querying, and transformations to scoped service interfaces (`IAuthService`, `ITrainingService`, `IReportsService`, `IAdminDashboardService`, etc.).
+2. **Result Pattern for Business Logic**: Business methods return explicit `Result` and `Result<T>` objects holding either the successful payload or a structured `Error` object (with `Code`, `Description`, and `ErrorType`), avoiding the performance overhead and anti-pattern of using exceptions for normal business validation.
+3. **RFC 7807 / RFC 9110 ProblemDetails**: Controller extension methods (`ToProblemDetails`) translate `Result.Error` directly into standardized `ProblemDetails` JSON responses, automatically mapping error types (`NotFound`, `Validation`, `Conflict`, `Forbidden`, `Unauthorized`) to standard HTTP status codes.
+4. **Global Exception Handling (`IExceptionHandler`)**: Modern ASP.NET Core 8 `GlobalExceptionHandler` intercepts any unhandled runtime exceptions, logs them with `ILogger`, and outputs a consistent 500 `ProblemDetails` response with a correlation `traceId`.
+5. **Dual Identifier Pattern**: Entities use auto-incrementing integer Primary Keys (`Id`) for fast internal relational joins and indexing, while exposing a GUID (`PublicId`) on public API routes to prevent sequential ID guessing.
+6. **ACID Transaction Management**: Multi-step operations leverage EF Core execution strategies (`CreateExecutionStrategy`) and explicit transactions (`BeginTransactionAsync`) to ensure resilience and transactional integrity with SQL Server.
 
 ---
 
@@ -146,11 +150,12 @@ erDiagram
     STUDENT_REPORTS ||--o{ REPORT_EVALUATIONS : "receives"
 ```
 
-### Advanced Database Features Implemented:
+### Database Features Implemented:
 - **Global Query Filters**: Soft delete filters (`HasQueryFilter(e => !e.IsDeleted)`) configured on `User`, `Company`, `College`, `TrainingRequest`, and related entities to automatically filter out soft-deleted records across all queries.
 - **Filtered Unique Indexes**:
   - `RoleUpgradeRequest`: Unique index on `(UserId, RequestedRoleId)` filtered where `[Status] = 'Pending'`, preventing concurrent duplicate pending requests for the same role.
   - `TrainingRequest`: Unique index on `(StudentId, AcademicYear, Semester, CompanyId)` preventing duplicate submissions for the same training cycle.
+  - `ReportEvaluation`: Unique index on `(StudentReportId, Phase)` ensuring one evaluation per phase.
 - **SQL Check Constraints**:
   - `CHK_GPA_Range`: Enforces `GPA >= 0 AND GPA <= 5` on `StudentProfile`.
   - `CHK_Dates_Logic`: Ensures `StartDate > GETUTCDATE()` on training requests.
@@ -184,10 +189,12 @@ Authentication is implemented using stateless **JWT Bearer tokens**:
 ## Frontend Integration
 
 The frontend is a modern Single Page Application (SPA) built with **React 19**, **TypeScript**, and **Vite**:
-- **API Consumption**: Uses **Axios** with request interceptors to automatically attach JWT authorization headers and response interceptors for centralized error handling.
+- **API Consumption & Error Handling**: Uses **Axios** with request interceptors to automatically attach JWT authorization headers, and response interceptors parsing RFC 7807 `ProblemDetails` payloads.
+- **Global Error Handling**: Integrated error modal store (`useErrorModalStore`) displaying friendly localized error dialogs with error codes and correlation trace IDs without crashing the UI.
 - **Data Fetching & Caching**: Employs **TanStack Query (React Query v5)** for server state caching, pagination, background refetching, and optimistic mutations.
 - **Client State**: Lightweight global state management powered by **Zustand**.
 - **Form Management**: Structured forms using **React Hook Form** paired with **Zod** schema validation.
+- **In-Browser Document Viewer**: Built-in `FileViewerModal` for instant preview of uploaded files and documents.
 - **Role-Based Routing**: Protected routes in React Router dynamically guard views according to the authenticated user's role.
 - **Bilingual Interface**: Integrated **i18next** configuration supporting Arabic and English interfaces with RTL/LTR layout handling.
 
@@ -198,12 +205,12 @@ The frontend is a modern Single Page Application (SPA) built with **React 19**, 
 ```
 SummerTraining-System/
 ├── Backend/
-│   ├── Common/                  # Error codes, file settings, and middleware
+│   ├── Common/                  # Error codes, Result pattern, and GlobalExceptionHandler
 │   ├── Controllers/             # API Controllers (Auth, Dashboard, Reports, Training, Lookups)
 │   ├── Data/                    # DbContext, Entity configurations, Migrations, Seed initializer
 │   ├── DTOs/                    # Data transfer objects grouped by feature domain
 │   ├── Entities/                # Domain models (Core, Enums, Reports)
-│   ├── Extensions/              # Claims and helper extensions
+│   ├── Extensions/              # Claims and ControllerExtensions (ProblemDetails mapping)
 │   ├── Services/                # Service interfaces and implementations
 │   ├── Uploads/                 # Storage for uploaded letters, proofs, and documents
 │   ├── appsettings.json         # Configuration (Connection strings, JWT settings)
@@ -213,13 +220,14 @@ SummerTraining-System/
 │   ├── src/
 │   │   ├── api/                 # Axios client instance and API endpoint functions
 │   │   ├── assets/              # Static media assets
-│   │   ├── components/          # Reusable UI components (Modals, Tables, Forms, Layouts)
+│   │   ├── components/          # Reusable UI components (Modals, Tables, Forms, Layouts, Viewers)
 │   │   ├── i18n/                # Localization configurations and translation files
 │   │   ├── layouts/             # Dashboard and authentication layout wrappers
 │   │   ├── pages/               # Page views grouped by role (admin, college, company, student, user)
 │   │   ├── router/              # Route definitions and role guards
-│   │   ├── store/               # Zustand state stores (auth, UI)
-│   │   ├── types/               # TypeScript interfaces matching backend DTOs
+│   │   ├── store/               # Zustand state stores (auth, UI, error modal)
+│   │   ├── types/               # TypeScript interfaces matching backend DTOs & Enums
+│   │   ├── utils/               # Error formatting and helper utilities
 │   │   ├── App.tsx              # Root component
 │   │   └── main.tsx             # Application bootstrap
 │   ├── package.json             # NPM dependencies and build scripts

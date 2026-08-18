@@ -9,6 +9,7 @@ import {
   StudentReportSummaryDto,
   SubmitReportDto,
   TemplateDetailsDto,
+  StudentReportDetailsDto,
 } from '../types/reports';
 
 const formatTemplatePayload = (dto: SaveTemplateDto) => {
@@ -73,7 +74,11 @@ export const reportsService = {
   },
 
   evaluateReport: async (dto: EvaluateReportDto): Promise<void> => {
-    await axiosClient.post('/Reports/evaluate-report', dto);
+    await axiosClient.post('/Reports/evaluate-report', {
+      studentReportPublicId: dto.studentReportPublicId,
+      score: dto.score,
+      comments: dto.comments || dto.feedback,
+    });
   },
 
   deleteTemplate: async (templatePublicId: string): Promise<void> => {
@@ -112,5 +117,14 @@ export const reportsService = {
       responseType: 'blob',
     });
     return res.data;
+  },
+
+  getStudentReportDetails: async (studentReportPublicId: string): Promise<StudentReportDetailsDto> => {
+    const res = await axiosClient.get<StudentReportDetailsDto>(`/Reports/submission/${studentReportPublicId}`);
+    return res.data;
+  },
+
+  deleteStudentReport: async (studentReportPublicId: string): Promise<void> => {
+    await axiosClient.delete(`/Reports/submission/${studentReportPublicId}`);
   },
 };

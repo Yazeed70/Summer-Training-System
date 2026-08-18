@@ -30,6 +30,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { DynamicReportFormRunner } from '../../components/dynamic-form/DynamicReportFormRunner';
+import { StudentReportAnswersViewer } from '../../components/dynamic-form/StudentReportAnswersViewer';
 
 export const StudentReportsPage: React.FC = () => {
   const { t } = useTranslation();
@@ -43,6 +44,8 @@ export const StudentReportsPage: React.FC = () => {
   // Modals State
   const [activeTemplate, setActiveTemplate] = useState<TemplateDetailsDto | null>(null);
   const [fillModalOpen, setFillModalOpen] = useState(false);
+  const [viewAnswersModalOpen, setViewAnswersModalOpen] = useState(false);
+  const [selectedReportPublicId, setSelectedReportPublicId] = useState<string | null>(null);
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
   const [selectedReportFeedback, setSelectedReportFeedback] = useState<StudentReportSummaryDto | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -92,9 +95,7 @@ export const StudentReportsPage: React.FC = () => {
       setActiveTemplate(null);
       fetchReports();
     } catch (err: any) {
-      console.error(err);
-      const msg = err.response?.data?.devMessage || err.response?.data?.message || 'Failed to submit report.';
-      toast.error(msg);
+      console.error('Failed to submit report:', err);
     } finally {
       setSubmitting(false);
     }
@@ -103,6 +104,11 @@ export const StudentReportsPage: React.FC = () => {
   const handleOpenFeedback = (report: StudentReportSummaryDto) => {
     setSelectedReportFeedback(report);
     setFeedbackModalOpen(true);
+  };
+
+  const handleOpenViewAnswers = (studentReportPublicId: string) => {
+    setSelectedReportPublicId(studentReportPublicId);
+    setViewAnswersModalOpen(true);
   };
 
   // KPI Statistics
@@ -300,10 +306,16 @@ export const StudentReportsPage: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleOpenFill(item.templatePublicId)}
+              onClick={() => {
+                if (item.studentReportPublicId) {
+                  handleOpenViewAnswers(item.studentReportPublicId);
+                } else {
+                  handleOpenFill(item.templatePublicId);
+                }
+              }}
               leftIcon={<Eye className="w-3.5 h-3.5" />}
             >
-              View Form
+              View Submission
             </Button>
             {(item.companyFeedback || item.collegeFeedback || item.companyScore || item.collegeScore) && (
               <Button
@@ -579,6 +591,33 @@ export const StudentReportsPage: React.FC = () => {
               </Button>
             </div>
           </div>
+        )}
+      </Modal>
+
+      {/* MODAL 3: View Submitted Answers Modal */}
+      <Modal
+        isOpen={viewAnswersModalOpen}
+        onClose={() => {
+          setViewAnswersModalOpen(false);
+          setSelectedReportPublicId(null);
+        }}
+        title="Report Submission & Answers"
+        maxWidth="2xl"
+      >
+        {selectedReportPublicId && (
+          <StudentReportAnswersViewer
+            studentReportPublicId={selectedReportPublicId}
+            showDeleteButton={true}
+            onDeleteSubmission={() => {
+              setViewAnswersModalOpen(false);
+              setSelectedReportPublicId(null);
+              fetchReports();
+            }}
+            onClose={() => {
+              setViewAnswersModalOpen(false);
+              setSelectedReportPublicId(null);
+            }}
+          />
         )}
       </Modal>
     </div>
