@@ -4,9 +4,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using summer_training_app.Common.Constants;
+using summer_training_app.Common.Results;
 using summer_training_app.Data;
 using summer_training_app.DTOs.Reports;
-using summer_training_app.DTOs.Shared;
 using summer_training_app.Entities.Enums;
 using summer_training_app.Entities.Reports;
 using summer_training_app.Services.Interfaces;
@@ -22,7 +22,7 @@ namespace summer_training_app.Services.Implementations
             _context = context;
         }
 
-        public async Task<(Guid ReportTemplatePublicId, ApiErrorResponseDTO? Error)> CreateReportTemplateAsync(SaveTemplateDto reportDto, int userId)
+        public async Task<Result<Guid>> CreateReportTemplateAsync(SaveTemplateDto reportDto, int userId)
         {
             var collegeRep = await _context.CollegeRepresentatives
                 .FirstOrDefaultAsync(cr => cr.UserId == userId);
@@ -32,11 +32,15 @@ namespace summer_training_app.Services.Implementations
 
             if (collegeRep == null && companyRep == null)
             {
-                return (Guid.Empty, new ApiErrorResponseDTO
+                return Error.Forbidden(ErrorCodes.UnauthorizedAccess, "You are not authorized as a college or company representative.");
+            }
+            if(companyRep != null && companyRep.CompanyId != null)
+            {
+                var company = await _context.Companies.Where(c => c.Id == companyRep.CompanyId && c.IsApproved == true).FirstOrDefaultAsync();
+                if(company == null)
                 {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "You are not authorized as a college or company representative."
-                });
+                    return Error.Forbidden(ErrorCodes.CompanyIsNotApproved, "The company you represent is not approved.");
+                }
             }
 
             var templateTitle = !string.IsNullOrWhiteSpace(reportDto.TemplateTitle)
@@ -45,20 +49,12 @@ namespace summer_training_app.Services.Implementations
 
             if (string.IsNullOrWhiteSpace(templateTitle))
             {
-                return (Guid.Empty, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.TemplateTitleMissing,
-                    DevMessage = "Template title is required."
-                });
+                return Error.Validation(ErrorCodes.TemplateTitleMissing, "Template title is required.");
             }
 
             if (reportDto.Questions == null || !reportDto.Questions.Any())
             {
-                return (Guid.Empty, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.TemplateQuestionsMissing,
-                    DevMessage = "At least one question is required."
-                });
+                return Error.Validation(ErrorCodes.TemplateQuestionsMissing, "At least one question is required.");
             }
 
             var reportTemplate = new ReportTemplate
@@ -104,23 +100,19 @@ namespace summer_training_app.Services.Implementations
                 }
             });
 
-            return (reportTemplate.PublicId, null);
+            return reportTemplate.PublicId;
         }
 
-        public async Task<(List<StudentReportSummaryDto>? Data, ApiErrorResponseDTO? Error)> GetMyReportsAsync(int userId)
+        public async Task<Result<List<StudentReportSummaryDto>>> GetMyReportsAsync(int userId)
         {
             var student = await _context.StudentProfiles
                 .FirstOrDefaultAsync(sp => sp.UserId == userId);
 
             if (student == null)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "Student profile not found for this user."
-                });
+                return Error.NotFound(ErrorCodes.UserNotFound, "Student profile not found for this user.");
             }
-            // 1. fetch the current company of student
+
             var activeTraining = await _context.TrainingRecords
                 .Where(tr => tr.StudentId == userId && tr.Status == enTrainingStatus.Active)
                 .OrderByDescending(tr => tr.CreatedAt)
@@ -130,7 +122,6 @@ namespace summer_training_app.Services.Implementations
                 .Where(t => t.IsAvailable && (t.CollegeId == student.CollegeId || (activeTraining != null && t.CompanyId == activeTraining.CompanyId)))
                 .ToListAsync();
 
-            // 2. fetch all the reports that have been submitted by student(or start with it)
             var submittedReports = await _context.StudentReports
                 .Include(sr => sr.ReportTemplate)
                 .Include(sr => sr.ReportTemplate.Questions)
@@ -138,10 +129,8 @@ namespace summer_training_app.Services.Implementations
                 .Where(sr => sr.StudentId == student.UserId)
                 .ToListAsync();
 
-            // extract the id number of submitted Template to avoid dublicated
             var submittedTemplateIds = submittedReports.Select(sr => sr.TemplateId).ToHashSet();
 
-            // 3. fetch pending template and that are not submitted yet
             var pendingTemplates = await _context.ReportTemplates
                 .Include(t => t.Questions)
                 .Where(t => t.IsAvailable &&
@@ -151,7 +140,6 @@ namespace summer_training_app.Services.Implementations
 
             var result = new List<StudentReportSummaryDto>();
 
-            // 4. Adding submitted reports to the result
             foreach (var submission in submittedReports)
             {
                 var companyEval = submission.Evaluations.FirstOrDefault(e => e.Phase == enEvaluationPhase.CompanyEvaluation);
@@ -174,7 +162,6 @@ namespace summer_training_app.Services.Implementations
                 });
             }
 
-            // 5. Adding pending templates to the result
             foreach (var template in pendingTemplates)
             {
                 result.Add(new StudentReportSummaryDto
@@ -194,27 +181,21 @@ namespace summer_training_app.Services.Implementations
                 });
             }
 
-            // 6. Order the result by submission date, with pending reports at the end
-            // orderby: order the result from smallest to largest (from 0 to 1), Draft == 0 so it mean => order by (0) 
             result = result.OrderBy(r => r.Status != enReportStatus.Draft) 
                            .ThenByDescending(r => r.SubmittedAt)
                            .ToList();
 
-            return (result, null);
+            return result;
         }
 
-        public async Task<(Guid StudentReportPublicId, ApiErrorResponseDTO? Error)> SubmitReportAsync(SubmitReportDto submissionDto, int userId)
+        public async Task<Result<Guid>> SubmitReportAsync(SubmitReportDto submissionDto, int userId)
         {
             var student = await _context.StudentProfiles
                 .FirstOrDefaultAsync(sp => sp.UserId == userId);
 
             if (student == null)
             {
-                return (Guid.Empty, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "Student profile not found for this user."
-                });
+                return Error.NotFound(ErrorCodes.UserNotFound, "Student profile not found for this user.");
             }
 
             var activeTraining = await _context.TrainingRecords
@@ -224,11 +205,7 @@ namespace summer_training_app.Services.Implementations
 
             if (activeTraining == null)
             {
-                return (Guid.Empty, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.TrainingRequestNotFound,
-                    DevMessage = "No active training record found for the student."
-                });
+                return Error.Validation(ErrorCodes.TrainingRequestNotFound, "No active training record found for the student.");
             }
 
             var template = await _context.ReportTemplates
@@ -237,11 +214,7 @@ namespace summer_training_app.Services.Implementations
 
             if (template == null)
             {
-                return (Guid.Empty, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.TemplateNotFound,
-                    DevMessage = "The specified report template does not exist or is not available for you."
-                });
+                return Error.NotFound(ErrorCodes.TemplateNotFound, "The specified report template does not exist or is not available for you.");
             }
 
             var alreadySubmitted = await _context.StudentReports
@@ -249,11 +222,7 @@ namespace summer_training_app.Services.Implementations
 
             if (alreadySubmitted)
             {
-                return (Guid.Empty, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.ReportAlreadySubmitted,
-                    DevMessage = "You have already submitted a report for this template."
-                });
+                return Error.Conflict(ErrorCodes.ReportAlreadySubmitted, "You have already submitted a report for this template.");
             }
 
             enReportStatus initialStatus;
@@ -306,21 +275,17 @@ namespace summer_training_app.Services.Implementations
                 }
             });
 
-            return (studentReport.PublicId, null);
+            return studentReport.PublicId;
         }
 
-        public async Task<(List<CompanyStudentReportDto>? Data, ApiErrorResponseDTO? Error)> GetCompanyReportsAsync(int userId)
+        public async Task<Result<List<CompanyStudentReportDto>>> GetCompanyReportsAsync(int userId)
         {
             var companyRep = await _context.CompanyRepresentatives
                 .FirstOrDefaultAsync(cr => cr.UserId == userId);
 
             if (companyRep == null)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "You are not authorized as a company representative."
-                });
+                return Error.Forbidden(ErrorCodes.UnauthorizedAccess, "You are not authorized as a company representative.");
             }
 
             var reports = await _context.StudentReports
@@ -343,21 +308,17 @@ namespace summer_training_app.Services.Implementations
                 })
                 .ToListAsync();
 
-            return (reports, null);
+            return reports;
         }
 
-        public async Task<(List<CollegeReportTemplateDto>? Data, ApiErrorResponseDTO? Error)> GetCollegeTemplatesAsync(int userId)
+        public async Task<Result<List<CollegeReportTemplateDto>>> GetCollegeTemplatesAsync(int userId)
         {
             var rep = await _context.CollegeRepresentatives
                 .FirstOrDefaultAsync(cr => cr.UserId == userId);
 
             if (rep == null)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "You are not authorized as a college representative."
-                });
+                return Error.Forbidden(ErrorCodes.UnauthorizedAccess, "You are not authorized as a college representative.");
             }
 
             var reportTemplates = await _context.ReportTemplates
@@ -377,21 +338,17 @@ namespace summer_training_app.Services.Implementations
                 })
                 .ToListAsync();
 
-            return (reportTemplates, null);
+            return reportTemplates;
         }
 
-        public async Task<(List<CollegeReportTemplateDto>? Data, ApiErrorResponseDTO? Error)> GetCompanyTemplatesAsync(int userId)
+        public async Task<Result<List<CollegeReportTemplateDto>>> GetCompanyTemplatesAsync(int userId)
         {
             var rep = await _context.CompanyRepresentatives
                 .FirstOrDefaultAsync(cr => cr.UserId == userId);
 
             if (rep == null)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "You are not authorized as a company representative."
-                });
+                return Error.Forbidden(ErrorCodes.UnauthorizedAccess, "You are not authorized as a company representative.");
             }
 
             var reportTemplates = await _context.ReportTemplates
@@ -411,10 +368,10 @@ namespace summer_training_app.Services.Implementations
                 })
                 .ToListAsync();
 
-            return (reportTemplates, null);
+            return reportTemplates;
         }
 
-        public async Task<ApiErrorResponseDTO?> EvaluateReportAsync(EvaluateReportDto evalDto, int supervisorId)
+        public async Task<Result> EvaluateReportAsync(EvaluateReportDto evalDto, int supervisorId)
         {
             var compRep = await _context.CompanyRepresentatives
                 .FirstOrDefaultAsync(cr => cr.UserId == supervisorId);
@@ -424,11 +381,7 @@ namespace summer_training_app.Services.Implementations
 
             if (compRep == null && collegeRep == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "You are not authorized as a representative."
-                };
+                return Error.Forbidden(ErrorCodes.UnauthorizedAccess, "You are not authorized as a representative.");
             }
 
             var studentReport = await _context.StudentReports
@@ -439,120 +392,133 @@ namespace summer_training_app.Services.Implementations
 
             if (studentReport == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.StudentReportNotFound,
-                    DevMessage = "The student report was not found."
-                };
+                return Error.NotFound(ErrorCodes.StudentReportNotFound, "The student report was not found.");
             }
+
+            var strategy = _context.Database.CreateExecutionStrategy();
 
             if (compRep != null)
             {
                 if (studentReport.TrainingRecord.CompanyId != compRep.CompanyId)
                 {
-                    return new ApiErrorResponseDTO
-                    {
-                        Code = ErrorCodes.UnauthorizedAccess,
-                        DevMessage = "You do not have permission to evaluate reports for other companies."
-                    };
+                    return Error.Forbidden(ErrorCodes.UnauthorizedAccess, "You do not have permission to evaluate reports for other companies.");
                 }
 
-                if (studentReport.Status != enReportStatus.PendingCompanyReview)
-                {
-                    return new ApiErrorResponseDTO
-                    {
-                        Code = ErrorCodes.ReportAlreadySubmitted,
-                        DevMessage = "This report is not currently pending company review."
-                    };
-                }
+                var existingEval = await _context.ReportEvaluations
+                    .FirstOrDefaultAsync(e => e.StudentReportId == studentReport.Id && e.Phase == enEvaluationPhase.CompanyEvaluation);
 
-                var evaluation = new ReportEvaluation
+                if (existingEval != null)
                 {
-                    StudentReportId = studentReport.Id,
-                    CompanySupervisorId = compRep.UserId,
-                    Phase = enEvaluationPhase.CompanyEvaluation,
-                    Score = evalDto.Score,
-                    Comments = evalDto.Comments,
-                    EvaluationDate = DateTime.UtcNow
-                };
-
-                if (studentReport.ReportTemplate.RequiresCollegeEvaluation)
-                {
-                    studentReport.Status = enReportStatus.PendingCollegeReview;
+                    existingEval.Score = evalDto.Score;
+                    existingEval.Comments = evalDto.Comments;
+                    existingEval.EvaluationDate = DateTime.UtcNow;
                 }
                 else
                 {
-                    studentReport.Status = enReportStatus.Completed;
-                }
+                    if (studentReport.Status != enReportStatus.PendingCompanyReview)
+                    {
+                        return Error.Validation(ErrorCodes.ReportAlreadySubmitted, "This report is not currently pending company review.");
+                    }
 
-                using var transaction = await _context.Database.BeginTransactionAsync();
-                try
-                {
+                    var evaluation = new ReportEvaluation
+                    {
+                        StudentReportId = studentReport.Id,
+                        CompanySupervisorId = compRep.UserId,
+                        Phase = enEvaluationPhase.CompanyEvaluation,
+                        Score = evalDto.Score,
+                        Comments = evalDto.Comments,
+                        EvaluationDate = DateTime.UtcNow
+                    };
+
                     _context.ReportEvaluations.Add(evaluation);
-                    await _context.SaveChangesAsync();
-                    await transaction.CommitAsync();
-                }
-                catch
-                {
-                    await transaction.RollbackAsync();
-                    throw;
+
+                    if (studentReport.ReportTemplate.RequiresCollegeEvaluation)
+                    {
+                        studentReport.Status = enReportStatus.PendingCollegeReview;
+                    }
+                    else
+                    {
+                        studentReport.Status = enReportStatus.Completed;
+                    }
                 }
 
-                return null;
+                await strategy.ExecuteAsync(async () =>
+                {
+                    using var transaction = await _context.Database.BeginTransactionAsync();
+                    try
+                    {
+                        await _context.SaveChangesAsync();
+                        await transaction.CommitAsync();
+                    }
+                    catch
+                    {
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                });
+
+                return Result.Success();
             }
 
             if (collegeRep != null)
             {
                 if (studentReport.StudentProfile.CollegeId != collegeRep.CollegeId)
                 {
-                    return new ApiErrorResponseDTO
-                    {
-                        Code = ErrorCodes.UnauthorizedAccess,
-                        DevMessage = "You do not have permission to evaluate reports for other colleges."
-                    };
+                    return Error.Forbidden(ErrorCodes.UnauthorizedAccess, "You do not have permission to evaluate reports for other colleges.");
                 }
 
-                if (studentReport.Status != enReportStatus.PendingCollegeReview)
+                var existingEval = await _context.ReportEvaluations
+                    .FirstOrDefaultAsync(e => e.StudentReportId == studentReport.Id && e.Phase == enEvaluationPhase.CollegeEvaluation);
+
+                if (existingEval != null)
                 {
-                    return new ApiErrorResponseDTO
-                    {
-                        Code = ErrorCodes.ReportAlreadySubmitted,
-                        DevMessage = "This report is not currently pending college review."
-                    };
+                    existingEval.Score = evalDto.Score;
+                    existingEval.Comments = evalDto.Comments;
+                    existingEval.EvaluationDate = DateTime.UtcNow;
                 }
-
-                var evaluation = new ReportEvaluation
+                else
                 {
-                    StudentReportId = studentReport.Id,
-                    CollegeSupervisorId = collegeRep.UserId,
-                    Phase = enEvaluationPhase.CollegeEvaluation,
-                    Score = evalDto.Score,
-                    Comments = evalDto.Comments,
-                    EvaluationDate = DateTime.UtcNow
-                };
+                    if (studentReport.Status != enReportStatus.PendingCollegeReview)
+                    {
+                        return Error.Validation(ErrorCodes.ReportAlreadySubmitted, "This report is not currently pending college review.");
+                    }
 
-                studentReport.Status = enReportStatus.Completed;
+                    var evaluation = new ReportEvaluation
+                    {
+                        StudentReportId = studentReport.Id,
+                        CollegeSupervisorId = collegeRep.UserId,
+                        Phase = enEvaluationPhase.CollegeEvaluation,
+                        Score = evalDto.Score,
+                        Comments = evalDto.Comments,
+                        EvaluationDate = DateTime.UtcNow
+                    };
 
-                using var transaction = await _context.Database.BeginTransactionAsync();
-                try
-                {
                     _context.ReportEvaluations.Add(evaluation);
-                    await _context.SaveChangesAsync();
-                    await transaction.CommitAsync();
-                }
-                catch
-                {
-                    await transaction.RollbackAsync();
-                    throw;
+                    studentReport.Status = enReportStatus.Completed;
                 }
 
-                return null;
+                await strategy.ExecuteAsync(async () =>
+                {
+                    using var transaction = await _context.Database.BeginTransactionAsync();
+                    try
+                    {
+                        await _context.SaveChangesAsync();
+                        await transaction.CommitAsync();
+                    }
+                    catch
+                    {
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                });
+
+                return Result.Success();
             }
 
-            return null;
+            return Result.Success();
         }
 
-        public async Task<ApiErrorResponseDTO?> DeleteTemplateAsync(Guid templatePublicId, int userId)
+        public async Task<Result> DeleteTemplateAsync(Guid templatePublicId, int userId)
         {
             var collegeRep = await _context.CollegeRepresentatives
                 .FirstOrDefaultAsync(cr => cr.UserId == userId);
@@ -562,11 +528,7 @@ namespace summer_training_app.Services.Implementations
 
             if (collegeRep == null && companyRep == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "You are not authorized as a representative."
-                };
+                return Error.Forbidden(ErrorCodes.UnauthorizedAccess, "You are not authorized as a representative.");
             }
 
             var template = await _context.ReportTemplates
@@ -576,30 +538,22 @@ namespace summer_training_app.Services.Implementations
 
             if (template == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.TemplateNotFound,
-                    DevMessage = "The template was not found."
-                };
+                return Error.NotFound(ErrorCodes.TemplateNotFound, "The template was not found.");
             }
 
             var hasSubmissions = await _context.StudentReports.AnyAsync(sr => sr.TemplateId == template.Id);
             if (hasSubmissions)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.TemplateHasSubmissions,
-                    DevMessage = "This template cannot be deleted because there are student reports associated with it."
-                };
+                return Error.Conflict(ErrorCodes.TemplateHasSubmissions, "This template cannot be deleted because there are student reports associated with it.");
             }
 
             _context.ReportTemplates.Remove(template);
             await _context.SaveChangesAsync();
 
-            return null;
+            return Result.Success();
         }
 
-        public async Task<ApiErrorResponseDTO?> UpdateTemplateAsync(SaveTemplateDto updateDto, int userId)
+        public async Task<Result> UpdateTemplateAsync(SaveTemplateDto updateDto, int userId)
         {
             var collegeRep = await _context.CollegeRepresentatives
                 .FirstOrDefaultAsync(cr => cr.UserId == userId);
@@ -609,11 +563,7 @@ namespace summer_training_app.Services.Implementations
 
             if (collegeRep == null && companyRep == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "You are not authorized as a representative."
-                };
+                return Error.Forbidden(ErrorCodes.UnauthorizedAccess, "You are not authorized as a representative.");
             }
 
             var template = await _context.ReportTemplates
@@ -624,11 +574,7 @@ namespace summer_training_app.Services.Implementations
 
             if (template == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.TemplateNotFound,
-                    DevMessage = "The template was not found."
-                };
+                return Error.NotFound(ErrorCodes.TemplateNotFound, "The template was not found.");
             }
 
             var hasSubmissions = await _context.StudentReports.AnyAsync(sr => sr.TemplateId == template.Id);
@@ -683,10 +629,10 @@ namespace summer_training_app.Services.Implementations
                 }
             });
 
-            return null;
+            return Result.Success();
         }
 
-        public async Task<(TemplateDetailsDto? Data, ApiErrorResponseDTO? Error)> GetTemplateDetailsAsync(Guid templatePublicId, int userId)
+        public async Task<Result<TemplateDetailsDto>> GetTemplateDetailsAsync(Guid templatePublicId, int userId)
         {
             var template = await _context.ReportTemplates
                 .Include(t => t.Questions)
@@ -694,11 +640,7 @@ namespace summer_training_app.Services.Implementations
 
             if (template == null)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.TemplateNotFound,
-                    DevMessage = "The template was not found."
-                });
+                return Error.NotFound(ErrorCodes.TemplateNotFound, "The template was not found.");
             }
 
             bool isCollegeRep = await _context.CollegeRepresentatives.AnyAsync(cr => cr.UserId == userId && cr.CollegeId == template.CollegeId);
@@ -708,11 +650,7 @@ namespace summer_training_app.Services.Implementations
 
             if (!isCollegeRep && !isCompanyRep && !isCollegeStudent && !isCompanyStudent)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "You do not have permission to view this template."
-                });
+                return Error.Forbidden(ErrorCodes.UnauthorizedAccess, "You do not have permission to view this template.");
             }
 
             var hasSubmissions = await _context.StudentReports.AnyAsync(sr => sr.TemplateId == template.Id);
@@ -744,21 +682,17 @@ namespace summer_training_app.Services.Implementations
                 }).ToList()
             };
 
-            return (result, null);
+            return result;
         }
 
-        public async Task<(List<CollegeStudentReportDto>? Data, ApiErrorResponseDTO? Error)> GetCollegeReportsAsync(int userId)
+        public async Task<Result<List<CollegeStudentReportDto>>> GetCollegeReportsAsync(int userId)
         {
             var rep = await _context.CollegeRepresentatives
                 .FirstOrDefaultAsync(cr => cr.UserId == userId);
 
             if (rep == null)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "You are not authorized as a college representative."
-                });
+                return Error.Forbidden(ErrorCodes.UnauthorizedAccess, "You are not authorized as a college representative.");
             }
 
             var reports = await _context.StudentReports
@@ -780,7 +714,149 @@ namespace summer_training_app.Services.Implementations
                 })
                 .ToListAsync();
 
-            return (reports, null);
+            return reports;
+        }
+
+        public async Task<Result<StudentReportDetailsDto>> GetStudentReportDetailsAsync(Guid studentReportPublicId, int userId)
+        {
+            var studentReport = await _context.StudentReports
+                .Include(sr => sr.StudentProfile)
+                    .ThenInclude(sp => sp.User)
+                .Include(sr => sr.StudentProfile)
+                    .ThenInclude(sp => sp.College)
+                .Include(sr => sr.TrainingRecord)
+                    .ThenInclude(tr => tr.Company)
+                .Include(sr => sr.ReportTemplate)
+                    .ThenInclude(rt => rt.Questions)
+                .Include(sr => sr.Answers)
+                    .ThenInclude(a => a.ReportQuestion)
+                .Include(sr => sr.Evaluations)
+                    .ThenInclude(e => e.CompanySupervisor)
+                        .ThenInclude(cs => cs.User)
+                .Include(sr => sr.Evaluations)
+                    .ThenInclude(e => e.CollegeSupervisor)
+                        .ThenInclude(cs => cs.User)
+                .FirstOrDefaultAsync(sr => sr.PublicId == studentReportPublicId);
+
+            if (studentReport == null)
+            {
+                return Error.NotFound(ErrorCodes.StudentReportNotFound, "The student report submission was not found.");
+            }
+
+            bool isStudentOwner = studentReport.StudentId == userId;
+            bool isCompanyRep = await _context.CompanyRepresentatives
+                .AnyAsync(cr => cr.UserId == userId && cr.CompanyId == studentReport.TrainingRecord.CompanyId);
+            bool isCollegeRep = await _context.CollegeRepresentatives
+                .AnyAsync(cr => cr.UserId == userId && cr.CollegeId == studentReport.StudentProfile.CollegeId);
+
+            if (!isStudentOwner && !isCompanyRep && !isCollegeRep)
+            {
+                return Error.Forbidden(ErrorCodes.UnauthorizedAccess, "You do not have permission to view this report submission.");
+            }
+
+            var companyEval = studentReport.Evaluations
+                .FirstOrDefault(e => e.Phase == enEvaluationPhase.CompanyEvaluation);
+            var collegeEval = studentReport.Evaluations
+                .FirstOrDefault(e => e.Phase == enEvaluationPhase.CollegeEvaluation);
+
+            bool hasEvaluations = studentReport.Evaluations.Any() || studentReport.Status == enReportStatus.Completed;
+            bool canDelete = isStudentOwner && !hasEvaluations;
+
+            var answersMap = studentReport.Answers.ToDictionary(a => a.QuestionId, a => a.AnswerValue);
+
+            var answerDetails = studentReport.ReportTemplate.Questions
+                .OrderBy(q => q.OrderPosition)
+                .Select(q =>
+                {
+                    answersMap.TryGetValue(q.Id, out var val);
+                    return new ReportAnswerDetailDto
+                    {
+                        QuestionId = q.Id,
+                        QuestionText = q.QuestionText,
+                        QuestionType = q.QuestionType,
+                        OrderPosition = q.OrderPosition,
+                        IsRequired = q.IsRequired,
+                        OptionsPayload = q.OptionsPayload,
+                        Options = !string.IsNullOrWhiteSpace(q.OptionsPayload)
+                            ? System.Text.Json.JsonSerializer.Deserialize<List<string>>(q.OptionsPayload, (System.Text.Json.JsonSerializerOptions?)null)
+                            : null,
+                        AnswerValue = val ?? string.Empty,
+                        AttachmentPath = q.QuestionType == enQuestionType.FileUpload ? val : null
+                    };
+                }).ToList();
+
+            var result = new StudentReportDetailsDto
+            {
+                StudentReportPublicId = studentReport.PublicId,
+                TemplatePublicId = studentReport.ReportTemplate.PublicId,
+                TemplateTitle = studentReport.ReportTemplate.Title,
+                TemplateDescription = studentReport.ReportTemplate.Description,
+                DueDate = studentReport.ReportTemplate.DueDate,
+                SubmissionDate = studentReport.SubmissionDate,
+                Status = studentReport.Status,
+                StudentId = studentReport.StudentId,
+                StudentName = studentReport.StudentProfile?.User?.Name ?? string.Empty,
+                StudentEmail = studentReport.StudentProfile?.User?.Email,
+                CollegeName = studentReport.StudentProfile?.College?.CollegeName,
+                CompanyName = studentReport.TrainingRecord?.Company?.CompanyName,
+                RequiresCompanyEvaluation = studentReport.ReportTemplate.RequiresCompanyEvaluation,
+                RequiresCollegeEvaluation = studentReport.ReportTemplate.RequiresCollegeEvaluation,
+                CanDelete = canDelete,
+                Answers = answerDetails,
+                CompanyScore = companyEval != null ? (enEvaluationScore?)companyEval.Score : null,
+                CompanyFeedback = companyEval?.Comments,
+                CompanyEvaluatedAt = companyEval?.EvaluationDate,
+                CompanyEvaluatorName = companyEval?.CompanySupervisor?.User?.Name,
+                CollegeScore = collegeEval != null ? (enEvaluationScore?)collegeEval.Score : null,
+                CollegeFeedback = collegeEval?.Comments,
+                CollegeEvaluatedAt = collegeEval?.EvaluationDate,
+                CollegeEvaluatorName = collegeEval?.CollegeSupervisor?.User?.Name
+            };
+
+            return result;
+        }
+
+        public async Task<Result> DeleteStudentReportAsync(Guid studentReportPublicId, int userId)
+        {
+            var studentReport = await _context.StudentReports
+                .Include(sr => sr.Evaluations)
+                .Include(sr => sr.Answers)
+                .FirstOrDefaultAsync(sr => sr.PublicId == studentReportPublicId);
+
+            if (studentReport == null)
+            {
+                return Error.NotFound(ErrorCodes.StudentReportNotFound, "The student report submission was not found.");
+            }
+
+            if (studentReport.StudentId != userId)
+            {
+                return Error.Forbidden(ErrorCodes.UnauthorizedAccess, "You can only delete your own submitted reports.");
+            }
+
+            if (studentReport.Evaluations.Any() || studentReport.Status == enReportStatus.Completed)
+            {
+                return Error.Conflict(ErrorCodes.ReportAlreadyEvaluated, "This report cannot be deleted because it has already been evaluated.");
+            }
+
+            var strategy = _context.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
+            {
+                using var transaction = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    _context.ReportAnswers.RemoveRange(studentReport.Answers);
+                    _context.StudentReports.Remove(studentReport);
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            });
+
+            return Result.Success();
         }
     }
 }

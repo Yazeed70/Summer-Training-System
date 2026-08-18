@@ -1,14 +1,11 @@
+using System;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using summer_training_app.Common.Constants;
 using summer_training_app.DTOs.Reports;
-using summer_training_app.DTOs.Shared;
 using summer_training_app.Extensions;
-using summer_training_app.Services.Implementations;
 using summer_training_app.Services.Interfaces;
-using System;
-using System.Threading.Tasks;
 
 namespace summer_training_app.Controllers.Reports
 {
@@ -19,6 +16,7 @@ namespace summer_training_app.Controllers.Reports
     {
         private readonly IReportsService _reportsService;
         private readonly IFilesService _filesService;
+
         public ReportsController(IReportsService reportsService, IFilesService filesService)
         {
             _reportsService = reportsService;
@@ -32,23 +30,18 @@ namespace summer_training_app.Controllers.Reports
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _reportsService.CreateReportTemplateAsync(reportDto, userId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok(new
             {
-                reportPublicId = result.ReportTemplatePublicId
+                reportPublicId = result.Value
             });
         }
 
@@ -59,21 +52,16 @@ namespace summer_training_app.Controllers.Reports
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _reportsService.GetMyReportsAsync(userId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpPost("submit-report")]
@@ -83,26 +71,18 @@ namespace summer_training_app.Controllers.Reports
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _reportsService.SubmitReportAsync(submissionDto, userId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.TemplateNotFound)
-                    return NotFound(result.Error);
-
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok(new
             {
-                studentReportId = result.StudentReportPublicId
+                studentReportId = result.Value
             });
         }
 
@@ -113,21 +93,16 @@ namespace summer_training_app.Controllers.Reports
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _reportsService.GetCompanyReportsAsync(userId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpGet("college-templates")]
@@ -137,21 +112,16 @@ namespace summer_training_app.Controllers.Reports
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _reportsService.GetCollegeTemplatesAsync(userId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpGet("company-templates")]
@@ -161,21 +131,16 @@ namespace summer_training_app.Controllers.Reports
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _reportsService.GetCompanyTemplatesAsync(userId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpPost("evaluate-report")]
@@ -185,24 +150,13 @@ namespace summer_training_app.Controllers.Reports
             var supervisorId = User.GetInternalUserId();
             if (!supervisorId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
-            var error = await _reportsService.EvaluateReportAsync(evalDto, supervisorId.Value);
-
-            if (error != null)
+            var result = await _reportsService.EvaluateReportAsync(evalDto, supervisorId.Value);
+            if (result.IsFailure)
             {
-                if (error.Code == ErrorCodes.StudentReportNotFound)
-                    return NotFound(error);
-
-                if (error.Code == ErrorCodes.UnauthorizedAccess || error.Code == ErrorCodes.InvalidCompanyId)
-                    return StatusCode(StatusCodes.Status403Forbidden, error);
-
-                return BadRequest(error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok();
@@ -215,24 +169,13 @@ namespace summer_training_app.Controllers.Reports
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
-            var error = await _reportsService.DeleteTemplateAsync(TemplatePublicId, userId.Value);
-
-            if (error != null)
+            var result = await _reportsService.DeleteTemplateAsync(TemplatePublicId, userId.Value);
+            if (result.IsFailure)
             {
-                if (error.Code == ErrorCodes.TemplateNotFound)
-                    return NotFound(error);
-
-                if (error.Code == ErrorCodes.UnauthorizedAccess || error.Code == ErrorCodes.InvalidCollegeId)
-                    return StatusCode(StatusCodes.Status403Forbidden, error);
-
-                return BadRequest(error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok();
@@ -245,11 +188,7 @@ namespace summer_training_app.Controllers.Reports
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             if (!updateDto.TemplatePublicId.HasValue || updateDto.TemplatePublicId.Value == Guid.Empty)
@@ -257,17 +196,10 @@ namespace summer_training_app.Controllers.Reports
                 updateDto.TemplatePublicId = TemplatePublicId;
             }
 
-            var error = await _reportsService.UpdateTemplateAsync(updateDto, userId.Value);
-
-            if (error != null)
+            var result = await _reportsService.UpdateTemplateAsync(updateDto, userId.Value);
+            if (result.IsFailure)
             {
-                if (error.Code == ErrorCodes.TemplateNotFound)
-                    return NotFound(error);
-
-                if (error.Code == ErrorCodes.UnauthorizedAccess || error.Code == ErrorCodes.InvalidCollegeId)
-                    return StatusCode(StatusCodes.Status403Forbidden, error);
-
-                return BadRequest(error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok();
@@ -280,27 +212,16 @@ namespace summer_training_app.Controllers.Reports
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _reportsService.GetTemplateDetailsAsync(id, userId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.TemplateNotFound)
-                    return NotFound(result.Error);
-
-                if (result.Error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, result.Error);
-
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpGet("college-student-reports")]
@@ -310,21 +231,16 @@ namespace summer_training_app.Controllers.Reports
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _reportsService.GetCollegeReportsAsync(userId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpPost("upload-attachment")]
@@ -332,47 +248,78 @@ namespace summer_training_app.Controllers.Reports
         public async Task<IActionResult> UploadReportAttachment(IFormFile file)
         {
             var userId = User.GetInternalUserId();
-
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _filesService.UploadFileAsync(file, "report_attachments");
-
-            if (result.Error != null)
-                return BadRequest(result.Error);
+            if (result.IsFailure)
+            {
+                return this.ToProblemDetails(result.Error);
+            }
 
             return Ok(new
             {
-                FilePath = result.Data.Value.FilePath
+                FilePath = result.Value.FilePath
             });
         }
 
+        [HttpGet("submission/{studentReportPublicId}")]
+        [Authorize(Roles = "Student,CollegeRep,CompanyRep")]
+        public async Task<IActionResult> GetStudentReportDetails(Guid studentReportPublicId)
+        {
+            var userId = User.GetInternalUserId();
+            if (!userId.HasValue)
+            {
+                return this.UnauthorizedProblem();
+            }
+
+            var result = await _reportsService.GetStudentReportDetailsAsync(studentReportPublicId, userId.Value);
+            if (result.IsFailure)
+            {
+                return this.ToProblemDetails(result.Error);
+            }
+
+            return Ok(result.Value);
+        }
+
+        [HttpDelete("submission/{studentReportPublicId}")]
+        [Authorize(Roles = "Student")]
+        public async Task<IActionResult> DeleteStudentReport(Guid studentReportPublicId)
+        {
+            var userId = User.GetInternalUserId();
+            if (!userId.HasValue)
+            {
+                return this.UnauthorizedProblem();
+            }
+
+            var result = await _reportsService.DeleteStudentReportAsync(studentReportPublicId, userId.Value);
+            if (result.IsFailure)
+            {
+                return this.ToProblemDetails(result.Error);
+            }
+
+            return Ok();
+        }
+
         [HttpGet("download-attachment")]
-        [Authorize(Roles ="CollegeRep,CompanyRep")]
+        [Authorize(Roles = "CollegeRep,CompanyRep,Student")]
         public async Task<IActionResult> DownloadAttachment([FromQuery] string filePath)
         {
-            var companyId = User.GetCompanyId();
-            var collegeId = User.GetCollegeId();
-
-            if (!companyId.HasValue && !collegeId.HasValue)
+            var userId = User.GetInternalUserId();
+            if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a company or college."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _filesService.DownloadFileAsync(filePath);
-            if (result.Error != null) return BadRequest(result.Error);
+            if (result.IsFailure)
+            {
+                return this.ToProblemDetails(result.Error);
+            }
 
-            return PhysicalFile(result.Data.Value.PhysicalPath, result.Data.Value.ContentType, result.Data.Value.FileName);
+            return PhysicalFile(result.Value.PhysicalPath, result.Value.ContentType, result.Value.FileName);
         }
     }
 }

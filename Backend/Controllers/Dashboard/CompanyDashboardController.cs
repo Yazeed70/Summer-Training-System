@@ -1,12 +1,9 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using summer_training_app.Common.Constants;
 using summer_training_app.DTOs.Core;
 using summer_training_app.DTOs.Dashboard;
-using summer_training_app.DTOs.Shared;
 using summer_training_app.Extensions;
 using summer_training_app.Services.Interfaces;
 
@@ -30,59 +27,32 @@ namespace summer_training_app.Controllers.Dashboard
             var companyId = User.GetCompanyId();
             if (!companyId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a company."
-                });
+                return this.ForbiddenProblem("User is not associated with a company.");
             }
 
             var result = await _companyDashboardService.GetCompanyProfileAsync(companyId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.CompanyNotFound)
-                    return NotFound(result.Error);
-
-                return StatusCode(StatusCodes.Status403Forbidden, result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpPut("profile")]
         public async Task<IActionResult> UpdateCompanyProfile([FromBody] CreateCompanyDto dto)
         {
             var companyId = User.GetCompanyId();
-            if (!companyId.HasValue)
-            {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a company."
-                });
-            }
             var userId = User.GetInternalUserId();
-            if (!userId.HasValue)
+            if (!companyId.HasValue || !userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.ForbiddenProblem("User identity or company association is missing.");
             }
 
-            var error = await _companyDashboardService.UpdateCompanyAsync(dto, companyId.Value, userId.Value);
-
-            if (error != null)
+            var result = await _companyDashboardService.UpdateCompanyAsync(dto, companyId.Value, userId.Value);
+            if (result.IsFailure)
             {
-                if (error.Code == ErrorCodes.CompanyNotFound)
-                    return NotFound(error);
-
-                if (error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, error);
-
-                return BadRequest(error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok();
@@ -92,35 +62,16 @@ namespace summer_training_app.Controllers.Dashboard
         public async Task<IActionResult> DeleteCompanyProfile()
         {
             var companyId = User.GetCompanyId();
-            if (!companyId.HasValue)
-            {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a company."
-                });
-            }
             var userId = User.GetInternalUserId();
-            if (!userId.HasValue)
+            if (!companyId.HasValue || !userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.ForbiddenProblem("User identity or company association is missing.");
             }
 
-            var error = await _companyDashboardService.DeleteCompanyAsync(companyId.Value, userId.Value);
-
-            if (error != null)
+            var result = await _companyDashboardService.DeleteCompanyAsync(companyId.Value, userId.Value);
+            if (result.IsFailure)
             {
-                if (error.Code == ErrorCodes.CompanyNotFound)
-                    return NotFound(error);
-
-                if (error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, error);
-
-                return BadRequest(error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok();
@@ -130,32 +81,19 @@ namespace summer_training_app.Controllers.Dashboard
         public async Task<IActionResult> GetCompanyStudents()
         {
             var companyId = User.GetCompanyId();
-            if (!companyId.HasValue)
-            {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a company."
-                });
-            }
             var userId = User.GetInternalUserId();
-            if (!userId.HasValue)
+            if (!companyId.HasValue || !userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.ForbiddenProblem("User identity or company association is missing.");
             }
 
             var result = await _companyDashboardService.GetCompanyStudentsAsync(companyId.Value, userId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpGet("student-profile/{studentPublicId}")]
@@ -164,106 +102,51 @@ namespace summer_training_app.Controllers.Dashboard
             var companyId = User.GetCompanyId();
             if (!companyId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a company."
-                });
-            }
-            var userId = User.GetInternalUserId();
-            if (!userId.HasValue)
-            {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.ForbiddenProblem("User is not associated with a company.");
             }
 
             var result = await _companyDashboardService.GetStudentProfileAsync(studentPublicId, companyId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, result.Error);
-
-                return NotFound(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpPost("students/link")]
         public async Task<IActionResult> LinkStudent([FromBody] CreateTrainingRecordDto dto)
         {
             var companyId = User.GetCompanyId();
-            if (!companyId.HasValue)
-            {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a company."
-                });
-            }
             var userId = User.GetInternalUserId();
-            if (!userId.HasValue)
+            if (!companyId.HasValue || !userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.ForbiddenProblem("User identity or company association is missing.");
             }
 
             var result = await _companyDashboardService.LinkCompanyStudentAsync(dto, companyId.Value, userId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.UserNotFound)
-                    return NotFound(result.Error);
-
-                if (result.Error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, result.Error);
-
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(new { studentPublicId = result.NewPublicId });
+            return Ok(new { studentPublicId = result.Value });
         }
 
         [HttpDelete("students/{studentPublicId}")]
         public async Task<IActionResult> UnlinkStudent(Guid studentPublicId)
         {
             var companyId = User.GetCompanyId();
-            if (!companyId.HasValue)
-            {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a company."
-                });
-            }
             var userId = User.GetInternalUserId();
-            if (!userId.HasValue)
+            if (!companyId.HasValue || !userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.ForbiddenProblem("User identity or company association is missing.");
             }
 
-            var error = await _companyDashboardService.UnlinkCompanyStudentAsync(studentPublicId, companyId.Value, userId.Value);
-
-            if (error != null)
+            var result = await _companyDashboardService.UnlinkCompanyStudentAsync(studentPublicId, companyId.Value, userId.Value);
+            if (result.IsFailure)
             {
-                if (error.Code == ErrorCodes.UserNotFound)
-                    return NotFound(error);
-
-                if (error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, error);
-
-                return BadRequest(error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok();

@@ -1,16 +1,11 @@
+using System;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using summer_training_app.Common.Constants;
 using summer_training_app.DTOs.Core;
 using summer_training_app.DTOs.Dashboard;
-using summer_training_app.DTOs.Shared;
 using summer_training_app.Extensions;
-using summer_training_app.Services.Implementations;
 using summer_training_app.Services.Interfaces;
-using System;
-using System.Reflection.Metadata;
-using System.Threading.Tasks;
 
 namespace summer_training_app.Controllers.Dashboard
 {
@@ -30,59 +25,34 @@ namespace summer_training_app.Controllers.Dashboard
         public async Task<IActionResult> GetCollegeProfile()
         {
             var collegeId = User.GetCollegeId();
-            if(collegeId == null)
+            if (!collegeId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a college."
-                });
+                return this.ForbiddenProblem("User is not associated with a college.");
             }
+
             var result = await _collegeDashboardService.GetCollegeProfileAsync(collegeId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.CollegeNotFound)
-                    return NotFound(result.Error);
-
-                return StatusCode(StatusCodes.Status403Forbidden, result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpPut("profile")]
         public async Task<IActionResult> UpdateCollegeProfile([FromBody] CreateCollegeDto dto)
         {
             var collegeId = User.GetCollegeId();
-            if(collegeId == null)
-            {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a college."
-                });
-            }
             var userId = User.GetInternalUserId();
-            if(userId == null)
+            if (!collegeId.HasValue || !userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.ForbiddenProblem("User identity or college association is missing.");
             }
-            var error = await _collegeDashboardService.UpdateCollegeAsync(dto, collegeId.Value, userId.Value);
 
-            if (error != null)
+            var result = await _collegeDashboardService.UpdateCollegeAsync(dto, collegeId.Value, userId.Value);
+            if (result.IsFailure)
             {
-                if (error.Code == ErrorCodes.CollegeNotFound)
-                    return NotFound(error);
-
-                if (error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, error);
-
-                return BadRequest(error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok();
@@ -92,34 +62,16 @@ namespace summer_training_app.Controllers.Dashboard
         public async Task<IActionResult> DeleteCollegeProfile()
         {
             var collegeId = User.GetCollegeId();
-            if(collegeId == null)
-            {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a college."
-                });
-            }
             var userId = User.GetInternalUserId();
-            if(userId == null)
+            if (!collegeId.HasValue || !userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.ForbiddenProblem("User identity or college association is missing.");
             }
-            var error = await _collegeDashboardService.DeleteCollegeAsync(collegeId.Value, userId.Value);
 
-            if (error != null)
+            var result = await _collegeDashboardService.DeleteCollegeAsync(collegeId.Value, userId.Value);
+            if (result.IsFailure)
             {
-                if (error.Code == ErrorCodes.CollegeNotFound)
-                    return NotFound(error);
-
-                if (error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, error);
-
-                return BadRequest(error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok();
@@ -129,136 +81,72 @@ namespace summer_training_app.Controllers.Dashboard
         public async Task<IActionResult> GetCollegeStudents()
         {
             var collegeId = User.GetCollegeId();
-            if(collegeId == null)
-            {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a college."
-                });
-            }
             var userId = User.GetInternalUserId();
-            if(userId == null)
+            if (!collegeId.HasValue || !userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.ForbiddenProblem("User identity or college association is missing.");
             }
+
             var result = await _collegeDashboardService.GetCollegeStudentsAsync(collegeId.Value, userId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpGet("student-profile/{studentPublicId}")]
         public async Task<IActionResult> GetStudentProfile(Guid studentPublicId)
         {
             var collegeId = User.GetCollegeId();
-            if(collegeId == null)
+            if (!collegeId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a college."
-                });
+                return this.ForbiddenProblem("User is not associated with a college.");
             }
-            var userId = User.GetInternalUserId();
-            if(userId == null)
-            {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
-            }
+
             var result = await _collegeDashboardService.GetStudentProfileAsync(studentPublicId, collegeId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, result.Error);
-
-                return NotFound(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpPost("students/{userPublicId}/link")]
         public async Task<IActionResult> LinkStudent(Guid userPublicId)
         {
             var collegeId = User.GetCollegeId();
-            if(collegeId == null)
-            {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a college."
-                });
-            }
             var userId = User.GetInternalUserId();
-            if(userId == null)
+            if (!collegeId.HasValue || !userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.ForbiddenProblem("User identity or college association is missing.");
             }
+
             var result = await _collegeDashboardService.LinkCollegeStudentAsync(userPublicId, collegeId.Value, userId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.UserNotFound)
-                    return NotFound(result.Error);
-
-                if (result.Error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, result.Error);
-
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(new { studentPublicId = result.NewPublicId });
+            return Ok(new { studentPublicId = result.Value });
         }
 
         [HttpDelete("students/{studentPublicId}")]
         public async Task<IActionResult> UnlinkStudent(Guid studentPublicId)
         {
             var collegeId = User.GetCollegeId();
-            if(collegeId == null)
-            {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a college."
-                });
-            }
             var userId = User.GetInternalUserId();
-            if(userId == null)
+            if (!collegeId.HasValue || !userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.ForbiddenProblem("User identity or college association is missing.");
             }
-            var error = await _collegeDashboardService.UnlinkCollegeStudentAsync(studentPublicId, collegeId.Value, userId.Value);
 
-            if (error != null)
+            var result = await _collegeDashboardService.UnlinkCollegeStudentAsync(studentPublicId, collegeId.Value, userId.Value);
+            if (result.IsFailure)
             {
-                if (error.Code == ErrorCodes.UserNotFound)
-                    return NotFound(error);
-
-                if (error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, error);
-
-                return BadRequest(error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok();
@@ -268,31 +156,16 @@ namespace summer_training_app.Controllers.Dashboard
         public async Task<IActionResult> UploadCollegeDocument([FromForm] UploadDocumentDto dto)
         {
             var collegeId = User.GetCollegeId();
-            if (collegeId == null)
-            {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a college."
-                });
-            }
             var userId = User.GetInternalUserId();
-            if (userId == null)
+            if (!collegeId.HasValue || !userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.ForbiddenProblem("User identity or college association is missing.");
             }
+
             var result = await _collegeDashboardService.UploadCollegeDocumentAsync(dto, collegeId.Value, userId.Value);
-
-            if (result != null)
+            if (result.IsFailure)
             {
-                if (result.Code == ErrorCodes.InvalidCollegeId)
-                    return Unauthorized(result);
-
-                return BadRequest(result);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok();
@@ -302,37 +175,16 @@ namespace summer_training_app.Controllers.Dashboard
         public async Task<IActionResult> DeleteDocument(int documentId)
         {
             var collegeId = User.GetCollegeId();
-            if (collegeId == null)
-            {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a college."
-                });
-            }
             var userId = User.GetInternalUserId();
-            if (userId == null)
+            if (!collegeId.HasValue || !userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.ForbiddenProblem("User identity or college association is missing.");
             }
-            var error = await _collegeDashboardService.DeleteDocumentAsync(documentId, collegeId.Value, userId.Value);
 
-            if (error != null)
+            var result = await _collegeDashboardService.DeleteDocumentAsync(documentId, collegeId.Value, userId.Value);
+            if (result.IsFailure)
             {
-                if (error.Code == ErrorCodes.DocumentNotFound)
-                    return NotFound(error);
-
-                if (error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, error);
-
-                if (error.Code == ErrorCodes.InvalidCollegeId)
-                    return Unauthorized(error);
-
-                return BadRequest(error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok();
@@ -342,123 +194,71 @@ namespace summer_training_app.Controllers.Dashboard
         public async Task<IActionResult> GetPendingStudentRequests()
         {
             var collegeId = User.GetCollegeId();
-            if (collegeId == null)
-            {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a college."
-                });
-            }
-
             var userId = User.GetInternalUserId();
-            if (userId == null)
+            if (!collegeId.HasValue || !userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.ForbiddenProblem("User identity or college association is missing.");
             }
 
             var result = await _collegeDashboardService.GetPendingStudentRequestsAsync(collegeId.Value, userId.Value);
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, result.Error);
-
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpGet("handled-student-requests")]
         public async Task<IActionResult> GetHandledStudentRequests()
         {
             var collegeId = User.GetCollegeId();
-            if (collegeId == null)
-            {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a college."
-                });
-            }
-
             var userId = User.GetInternalUserId();
-            if (userId == null)
+            if (!collegeId.HasValue || !userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.ForbiddenProblem("User identity or college association is missing.");
             }
 
             var result = await _collegeDashboardService.GetHandledStudentRequestsAsync(collegeId.Value, userId.Value);
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, result.Error);
-
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpGet("student-requests/{publicId}")]
         public async Task<IActionResult> GetStudentRequestDetails(Guid publicId)
         {
             var userId = User.GetInternalUserId();
-            if (userId == null)
+            if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _collegeDashboardService.GetStudentRequestDetailsAsync(publicId, userId.Value);
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.UpgradeRequestNotFound)
-                    return NotFound(result.Error);
-
-                if (result.Error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, result.Error);
-
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpPost("handle-student-request/{publicId}")]
         public async Task<IActionResult> HandleStudentRequest(Guid publicId, [FromBody] HandleUpgradeRequestDto dto)
         {
             var userId = User.GetInternalUserId();
-            if (userId == null)
+            if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
-            var error = await _collegeDashboardService.HandleStudentRequestAsync(publicId, dto, userId.Value);
-            if (error != null)
+            var result = await _collegeDashboardService.HandleStudentRequestAsync(publicId, dto, userId.Value);
+            if (result.IsFailure)
             {
-                if (error.Code == ErrorCodes.UpgradeRequestNotFound)
-                    return NotFound(error);
-
-                if (error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, error);
-
-                return BadRequest(error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok(new { message = dto.IsApproved ? "Student request approved successfully." : "Student request rejected successfully." });
@@ -469,82 +269,55 @@ namespace summer_training_app.Controllers.Dashboard
         {
             var userId = User.GetInternalUserId();
             var collegeId = User.GetCollegeId();
-            if (userId == null || collegeId == null)
+            if (!userId.HasValue || !collegeId.HasValue)
             {
-                return Unauthorized(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User identity or college association is missing."
-                });
+                return this.ForbiddenProblem("User identity or college association is missing.");
             }
 
             var result = await _collegeDashboardService.GetProofFileAsync(publicId, collegeId.Value, userId.Value);
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.FileNotFound) return NotFound(result.Error);
-                if (result.Error.Code == ErrorCodes.UnauthorizedAccess) return StatusCode(StatusCodes.Status403Forbidden, result.Error);
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return PhysicalFile(result.PhysicalPath!, result.ContentType!, result.FileName!);
+            return PhysicalFile(result.Value.PhysicalPath, result.Value.ContentType, result.Value.FileName);
         }
 
         [HttpGet("document/{documentId}")]
         public async Task<IActionResult> DownloadCollegeDocument(int documentId)
         {
             var collegeId = User.GetCollegeId();
-            if (collegeId == null)
+            if (!collegeId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a college."
-                });
+                return this.ForbiddenProblem("User is not associated with a college.");
             }
 
             var result = await _collegeDashboardService.DownloadDocumentAsync(documentId, collegeId.Value);
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.DocumentNotFound || result.Error.Code == ErrorCodes.FileNotFound)
-                    return NotFound(result.Error);
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return PhysicalFile(result.PhysicalPath!, result.ContentType!, result.FileName!);
+            return PhysicalFile(result.Value.PhysicalPath, result.Value.ContentType, result.Value.FileName);
         }
 
         [HttpGet("documents")]
         public async Task<IActionResult> GetDocuments()
         {
             var collegeId = User.GetCollegeId();
-            if (!collegeId.HasValue)
-            {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a college."
-                });
-            }
             var userId = User.GetInternalUserId();
-            if (!userId.HasValue)
+            if (!collegeId.HasValue || !userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.ForbiddenProblem("User identity or college association is missing.");
             }
 
             var result = await _collegeDashboardService.GetDocumentsAsync(collegeId.Value, userId.Value);
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, result.Error);
-
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
     }
 }

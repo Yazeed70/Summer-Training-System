@@ -4,12 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.EntityFrameworkCore;
 using summer_training_app.Common.Constants;
-using summer_training_app.Data;
-using summer_training_app.DTOs.Core;
-using summer_training_app.DTOs.Shared;
-using summer_training_app.Entities.Core;
+using summer_training_app.Common.Results;
 using summer_training_app.Services.Interfaces;
 
 namespace summer_training_app.Services.Implementations
@@ -23,26 +19,19 @@ namespace summer_training_app.Services.Implementations
             _environment = environment;
         }
 
-        public async Task<((string FilePath, string OriginalName)? Data, ApiErrorResponseDTO? Error)> UploadFileAsync(IFormFile file, string folderName)
+        public async Task<Result<(string FilePath, string OriginalName)>> UploadFileAsync(IFormFile file, string folderName)
         {
             if (file == null || file.Length == 0)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.InvalidFileType,
-                    DevMessage = "Please select a valid file."
-                });
+                return Error.Validation(ErrorCodes.InvalidFileType, "Please select a valid file.");
             }
 
             var fileExtension = Path.GetExtension(file.FileName).ToLower();
             if (file.Length > FileSettings.maxFileSize || !FileSettings.allowedExtensions.Contains(fileExtension))
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.InvalidFileTypeOrTooLarge,
-                    DevMessage = FileSettings.errorMessage
-                });
+                return Error.Validation(ErrorCodes.InvalidFileTypeOrTooLarge, FileSettings.errorMessage);
             }
+
             var relativeFolder = Path.Combine("Uploads", folderName);
             var absoluteFolder = Path.Combine(_environment.ContentRootPath, relativeFolder);
 
@@ -59,19 +48,14 @@ namespace summer_training_app.Services.Implementations
 
             var relativeFilePath = Path.Combine(relativeFolder, storedFileName).Replace("\\", "/");
 
-            return ((relativeFilePath, file.FileName), null);
-
+            return (relativeFilePath, file.FileName);
         }
 
-        public async Task<((string PhysicalPath, string ContentType, string FileName)? Data, ApiErrorResponseDTO? Error)> DownloadFileAsync(string filePath)
+        public async Task<Result<(string PhysicalPath, string ContentType, string FileName)>> DownloadFileAsync(string filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath))
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.InvalidFilePath,
-                    DevMessage = "Invalid file path."
-                });
+                return Error.Validation(ErrorCodes.InvalidFilePath, "Invalid file path.");
             }
 
             var normalizedPath = filePath.TrimStart('/', '\\').Replace("/", Path.DirectorySeparatorChar.ToString());
@@ -79,20 +63,12 @@ namespace summer_training_app.Services.Implementations
 
             if (!absoluteFilePath.StartsWith(Path.GetFullPath(_environment.ContentRootPath), StringComparison.OrdinalIgnoreCase))
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.InvalidFilePath,
-                    DevMessage = "Access to the specified file path is restricted."
-                });
+                return Error.Forbidden(ErrorCodes.InvalidFilePath, "Access to the specified file path is restricted.");
             }
 
             if (!File.Exists(absoluteFilePath))
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.FileNotFound,
-                    DevMessage = "File not found on the server."
-                });
+                return Error.NotFound(ErrorCodes.FileNotFound, "File not found on the server.");
             }
 
             var provider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
@@ -103,7 +79,7 @@ namespace summer_training_app.Services.Implementations
 
             var fileName = Path.GetFileName(absoluteFilePath);
 
-            return ((absoluteFilePath, contentType, fileName), null);
+            return (absoluteFilePath, contentType, fileName);
         }
 
         public async Task DeleteFile(string relativeFilePath)
@@ -117,6 +93,8 @@ namespace summer_training_app.Services.Implementations
             {
                 File.Delete(absolutePath);
             }
+
+            await Task.CompletedTask;
         }
     }
 }

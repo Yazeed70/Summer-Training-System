@@ -1,12 +1,9 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using summer_training_app.Common.Constants;
 using summer_training_app.DTOs.Auth;
 using summer_training_app.DTOs.Dashboard;
-using summer_training_app.DTOs.Shared;
 using summer_training_app.Extensions;
 using summer_training_app.Services.Interfaces;
 
@@ -28,45 +25,33 @@ namespace summer_training_app.Controllers.Dashboard
         public async Task<IActionResult> GetUserProfile()
         {
             var userId = User.GetInternalUserId();
-            if (userId == null)
+            if (!userId.HasValue)
             {
-                return Unauthorized(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User identity is invalid or missing."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _userDashboardService.GetUserProfileAsync(userId.Value);
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.UserNotFound)
-                    return NotFound(result.Error);
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpPut("profile")]
         public async Task<IActionResult> UpdateUserProfile([FromBody] UpdateProfileDto dto)
         {
             var userId = User.GetInternalUserId();
-            if (userId == null)
+            if (!userId.HasValue)
             {
-                return Unauthorized(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User identity is invalid or missing."
-                });
+                return this.UnauthorizedProblem();
             }
 
-            var error = await _userDashboardService.UpdateUserProfileAsync(dto, userId.Value);
-            if (error != null)
+            var result = await _userDashboardService.UpdateUserProfileAsync(dto, userId.Value);
+            if (result.IsFailure)
             {
-                if (error.Code == ErrorCodes.UserNotFound)
-                    return NotFound(error);
-                return BadRequest(error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok(new { message = "Profile updated successfully." });
@@ -76,22 +61,15 @@ namespace summer_training_app.Controllers.Dashboard
         public async Task<IActionResult> SubmitGenericUpgradeRequest([FromForm] UpgradeRoleDto dto)
         {
             var userId = User.GetInternalUserId();
-            if (userId == null)
+            if (!userId.HasValue)
             {
-                return Unauthorized(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User identity is invalid or missing."
-                });
+                return this.UnauthorizedProblem();
             }
 
-            var error = await _userDashboardService.SubmitUpgradeRequestAsync(dto, userId.Value);
-            if (error != null)
+            var result = await _userDashboardService.SubmitUpgradeRequestAsync(dto, userId.Value);
+            if (result.IsFailure)
             {
-                if (error.Code == ErrorCodes.CollegeNotFound || error.Code == ErrorCodes.CompanyNotFound)
-                    return NotFound(error);
-
-                return BadRequest(error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok(new { message = "Role upgrade request submitted successfully." });
@@ -101,66 +79,51 @@ namespace summer_training_app.Controllers.Dashboard
         public async Task<IActionResult> GetUpgradeStatus()
         {
             var userId = User.GetInternalUserId();
-            if (userId == null)
+            if (!userId.HasValue)
             {
-                return Unauthorized(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User identity is invalid or missing."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _userDashboardService.GetMyUpgradeRequestStatusAsync(userId.Value);
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpGet("upgrade-history")]
         public async Task<IActionResult> GetUpgradeHistory()
         {
             var userId = User.GetInternalUserId();
-            if (userId == null)
+            if (!userId.HasValue)
             {
-                return Unauthorized(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User identity is invalid or missing."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _userDashboardService.GetMyUpgradeHistoryAsync(userId.Value);
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpPatch("cancel-request/{publicId}")]
         public async Task<IActionResult> CancelUpgradeRequest(Guid publicId)
         {
             var userId = User.GetInternalUserId();
-            if (userId == null)
+            if (!userId.HasValue)
             {
-                return Unauthorized(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User identity is invalid or missing."
-                });
+                return this.UnauthorizedProblem();
             }
 
-            var error = await _userDashboardService.CancelUpgradeRequestAsync(publicId, userId.Value);
-            if (error != null)
+            var result = await _userDashboardService.CancelUpgradeRequestAsync(publicId, userId.Value);
+            if (result.IsFailure)
             {
-                if (error.Code == ErrorCodes.UpgradeRequestNotFound)
-                    return NotFound(error);
-
-                return BadRequest(error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok(new { message = "Upgrade request canceled successfully." });
@@ -184,22 +147,18 @@ namespace summer_training_app.Controllers.Dashboard
         public async Task<IActionResult> GetProofFile(Guid publicId)
         {
             var userId = User.GetInternalUserId();
-            if (userId == null)
+            if (!userId.HasValue)
             {
-                return Unauthorized(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User identity is invalid or missing."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _userDashboardService.GetMyProofFileAsync(publicId, userId.Value);
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return NotFound(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return PhysicalFile(result.PhysicalPath!, result.ContentType!, result.FileName!);
+            return PhysicalFile(result.Value.PhysicalPath, result.Value.ContentType, result.Value.FileName);
         }
     }
 }

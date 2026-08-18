@@ -1,16 +1,19 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using summer_training_app.Common.Constants;
-using summer_training_app.Data;
-using summer_training_app.DTOs.Auth;
-using summer_training_app.DTOs.Shared;
-using summer_training_app.Entities.Core;
-using summer_training_app.Entities.Enums;
-using summer_training_app.Services.Interfaces;
+using System;
+using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
+using summer_training_app.Common.Constants;
+using summer_training_app.Common.Results;
+using summer_training_app.Data;
+using summer_training_app.DTOs.Auth;
+using summer_training_app.Entities.Core;
+using summer_training_app.Entities.Enums;
+using summer_training_app.Services.Interfaces;
 
 namespace summer_training_app.Services.Implementations
 {
@@ -25,7 +28,7 @@ namespace summer_training_app.Services.Implementations
             _configuration = configuration;
         }
 
-        public async Task<(string? Token, ApiErrorResponseDTO? Error)> LoginAsync(LoginRequestDto request)
+        public async Task<Result<string>> LoginAsync(LoginRequestDto request)
         {
             var user = await _context.Users
                 .Include(u => u.Role)
@@ -36,35 +39,35 @@ namespace summer_training_app.Services.Implementations
 
             if (user == null)
             {
-                return (null, new ApiErrorResponseDTO { Code = ErrorCodes.UserNotFound, DevMessage = "User not found." });
+                return Error.NotFound(ErrorCodes.UserNotFound, "User not found.");
             }
 
             bool isPasswordValid = BCrypt.Net.BCrypt.EnhancedVerify(request.Password, user.PasswordHash);
             if (!isPasswordValid)
             {
-                return (null, new ApiErrorResponseDTO { Code = ErrorCodes.UserNotFound, DevMessage = "Username or password is incorrect." });
+                return Error.NotFound(ErrorCodes.UserNotFound, "Username or password is incorrect.");
             }
 
             if (!user.IsActive)
             {
-                return (null, new ApiErrorResponseDTO { Code = ErrorCodes.UserInactive, DevMessage = "User is inactive." });
+                return Error.Unauthorized(ErrorCodes.UserInactive, "User is inactive.");
             }
 
             var token = GenerateJwtToken(user);
-            return (token, null);
+            return token;
         }
 
-        public async Task<(string? Token, ApiErrorResponseDTO? Error)> RegisterAsync(RegisterRequestDto request)
+        public async Task<Result<string>> RegisterAsync(RegisterRequestDto request)
         {
             if (await _context.Users.AnyAsync(u => u.Username == request.Username))
             {
-                return (null, new ApiErrorResponseDTO { Code = ErrorCodes.UserAlreadyExists, DevMessage = "Username already exists." });
+                return Error.Conflict(ErrorCodes.UserAlreadyExists, "Username already exists.");
             }
 
             var basicUserRole = await _context.Roles.FirstOrDefaultAsync(r => r.Id == (byte)enRoles.BasicUser);
             if (basicUserRole == null)
             {
-                return (null, new ApiErrorResponseDTO { Code = ErrorCodes.RoleNotFound, DevMessage = "Role not found." });
+                return Error.NotFound(ErrorCodes.RoleNotFound, "Role not found.");
             }
 
             string hashPassword = BCrypt.Net.BCrypt.EnhancedHashPassword(request.Password, 12);
@@ -87,18 +90,17 @@ namespace summer_training_app.Services.Implementations
                 .FirstOrDefaultAsync(u => u.Id == newUser.Id);
 
             var token = GenerateJwtToken(loadedUser ?? newUser);
-            return (token, null);
+            return token;
         }
 
-        public async Task<ApiErrorResponseDTO?> UpdateProfileAsync(UpdateProfileDto request, int userId)
+        public async Task<Result> UpdateProfileAsync(UpdateProfileDto request, int userId)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
 
-            if (user == null) return (new ApiErrorResponseDTO
+            if (user == null)
             {
-                Code = ErrorCodes.UserNotFound,
-                DevMessage = "User not found."
-            });
+                return Error.NotFound(ErrorCodes.UserNotFound, "User not found.");
+            }
 
             if (!string.IsNullOrWhiteSpace(request.Name))
             {
@@ -108,29 +110,21 @@ namespace summer_training_app.Services.Implementations
             if (!string.IsNullOrWhiteSpace(request.NewPassword))
             {
                 if (string.IsNullOrWhiteSpace(request.CurrentPassword))
-                    return (new ApiErrorResponseDTO
-                    {
-                        Code = ErrorCodes.CurrentPasswordRequired,
-                        DevMessage = "Current password is required."
-                    });
+                {
+                    return Error.Validation(ErrorCodes.CurrentPasswordRequired, "Current password is required.");
+                }
 
                 if (!BCrypt.Net.BCrypt.EnhancedVerify(request.CurrentPassword, user.PasswordHash))
-                    return (new ApiErrorResponseDTO
-                    {
-                        Code = ErrorCodes.InvalidCurrentPassword,
-                        DevMessage = "Current password is incorrect."
-                    });
+                {
+                    return Error.Validation(ErrorCodes.InvalidCurrentPassword, "Current password is incorrect.");
+                }
 
                 user.PasswordHash = BCrypt.Net.BCrypt.EnhancedHashPassword(request.NewPassword, 12);
             }
 
             await _context.SaveChangesAsync();
-            return null;
+            return Result.Success();
         }
-
-
-
-
 
         private string GenerateJwtToken(User user)
         {
@@ -161,7 +155,5 @@ namespace summer_training_app.Services.Implementations
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
-
-
     }
 }

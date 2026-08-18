@@ -1,20 +1,17 @@
-using Azure.Core;
-using Microsoft.AspNetCore.Hosting;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using summer_training_app.Common.Constants;
+using summer_training_app.Common.Results;
 using summer_training_app.Data;
 using summer_training_app.DTOs.Auth;
 using summer_training_app.DTOs.Core;
 using summer_training_app.DTOs.Dashboard;
-using summer_training_app.DTOs.Shared;
 using summer_training_app.Entities.Core;
 using summer_training_app.Entities.Enums;
 using summer_training_app.Services.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace summer_training_app.Services.Implementations
 {
@@ -107,45 +104,33 @@ namespace summer_training_app.Services.Implementations
                 .ToListAsync();
         }
 
-        public async Task<(string? NewStatus, ApiErrorResponseDTO? Error)> ToggleUserStatusAsync(Guid userPublicId, int currentUserId)
+        public async Task<Result<string>> ToggleUserStatusAsync(Guid userPublicId, int currentUserId)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.PublicId == userPublicId);
 
             if (user == null)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UserNotFound,
-                    DevMessage = "User not found."
-                });
+                return Error.NotFound(ErrorCodes.UserNotFound, "User not found.");
             }
 
             if (user.RoleId == (int)enRoles.SuperAdmin && user.Id == currentUserId)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.CannotModifySuperAdmin,
-                    DevMessage = "Cannot modify super admin status."
-                });
+                return Error.Forbidden(ErrorCodes.CannotModifySuperAdmin, "Cannot modify super admin status.");
             }
 
             user.IsActive = !user.IsActive;
             await _context.SaveChangesAsync();
 
             var status = user.IsActive ? "Active" : "Inactive";
-            return (status, null);
+            return status;
         }
 
-        public async Task<ApiErrorResponseDTO?> CreateCollegeRepAsync(CreateCollegeRepDto dto)
+        public async Task<Result> CreateCollegeRepAsync(CreateCollegeRepDto dto)
         {
             var college = await _context.Colleges.FirstOrDefaultAsync(c => c.CollegeName == dto.CollegeName);
             if (college == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.InvalidCollegeName,
-                    DevMessage = "College Name is required."
-                };
+                return Error.Validation(ErrorCodes.InvalidCollegeName, "College Name is required.");
             }
 
             var strategy = _context.Database.CreateExecutionStrategy();
@@ -183,19 +168,15 @@ namespace summer_training_app.Services.Implementations
                 }
             });
 
-            return null;
+            return Result.Success();
         }
         
-        public async Task<ApiErrorResponseDTO?> CreateCompanyRepAsync(CreateCompanyRepDto dto)
+        public async Task<Result> CreateCompanyRepAsync(CreateCompanyRepDto dto)
         {
             var company = await _context.Companies.FirstOrDefaultAsync(c => c.CompanyName == dto.CompanyName);
             if (company == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.InvalidCompanyName,
-                    DevMessage = "Company Name is required."
-                };
+                return Error.Validation(ErrorCodes.InvalidCompanyName, "Company Name is required.");
             }
 
             var strategy = _context.Database.CreateExecutionStrategy();
@@ -233,10 +214,10 @@ namespace summer_training_app.Services.Implementations
                 }
             });
 
-            return null;
+            return Result.Success();
         }
 
-        public async Task<(int CompanyId, ApiErrorResponseDTO? Error)> CreateCompanyAsync(CreateCompanyDto dto, int currentUserId)
+        public async Task<Result<int>> CreateCompanyAsync(CreateCompanyDto dto, int currentUserId)
         {
             var company = new Company
             {
@@ -250,10 +231,10 @@ namespace summer_training_app.Services.Implementations
             _context.Companies.Add(company);
             await _context.SaveChangesAsync();
 
-            return (company.Id, null);
+            return company.Id;
         }
 
-        public async Task<(CompanyDetailsDto? Data, ApiErrorResponseDTO? Error)> GetCompanyByIdAsync(int id)
+        public async Task<Result<CompanyDetailsDto>> GetCompanyByIdAsync(int id)
         {
             var company = await _context.Companies
                 .Include(c => c.TrainingRecords)
@@ -263,14 +244,10 @@ namespace summer_training_app.Services.Implementations
                 .FirstOrDefaultAsync(c => c.Id == id);
             if (company == null)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.CompanyNotFound,
-                    DevMessage = "Company not found."
-                });
+                return Error.NotFound(ErrorCodes.CompanyNotFound, "Company not found.");
             }
 
-            return (new CompanyDetailsDto
+            return new CompanyDetailsDto
             {
                 Id = company.Id,
                 Name = company.CompanyName,
@@ -282,20 +259,16 @@ namespace summer_training_app.Services.Implementations
                 CreatedByUserName = company.ApprovedByUserId != null ? company.ApprovedByUser?.Name : null,
                 ApprovedAt = company.ApprovedAt,
                 TotalStudents = company.TrainingRecords.Count(s => s.CompanyId == company.Id && s.Status == enTrainingStatus.Active)
-            }, null);
+            };
         }
 
-        public async Task<ApiErrorResponseDTO?> UpdateCompanyAsync(int id, CreateCompanyDto dto)
+        public async Task<Result> UpdateCompanyAsync(int id, CreateCompanyDto dto)
         {
             var company = await _context.Companies.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == id);
 
             if (company == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.CompanyNotFound,
-                    DevMessage = "Company not found."
-                };
+                return Error.NotFound(ErrorCodes.CompanyNotFound, "Company not found.");
             }
 
             company.CompanyName = dto.Name;
@@ -303,20 +276,16 @@ namespace summer_training_app.Services.Implementations
             company.CompanyAddress = dto.Address;
 
             await _context.SaveChangesAsync();
-            return null;
+            return Result.Success();
         }
         
-        public async Task<ApiErrorResponseDTO?> ToggleCompanyStatusAsync(int id)
+        public async Task<Result> ToggleCompanyStatusAsync(int id)
         {
             var company = await _context.Companies.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == id);
 
             if (company == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.CompanyNotFound,
-                    DevMessage = "Company not found."
-                };
+                return Error.NotFound(ErrorCodes.CompanyNotFound, "Company not found.");
             }
 
             if (!company.IsDeleted)
@@ -325,41 +294,29 @@ namespace summer_training_app.Services.Implementations
                                       await _context.TrainingRecords.AnyAsync(sp => sp.CompanyId == id && sp.Status == enTrainingStatus.Active);
                 if (hasLinkedUsers)
                 {
-                    return new ApiErrorResponseDTO
-                    {
-                        Code = ErrorCodes.CompanyHasLinkedUsers,
-                        DevMessage = "Cannot deactivate this company because it has linked users."
-                    };
+                    return Error.Conflict(ErrorCodes.CompanyHasLinkedUsers, "Cannot deactivate this company because it has linked users.");
                 }
             }
 
             company.IsDeleted = !company.IsDeleted;
 
             await _context.SaveChangesAsync();
-            return null;
+            return Result.Success();
         }
         
-        public async Task<ApiErrorResponseDTO?> ApproveCompanyAsync(int id, int currentUserId)
+        public async Task<Result> ApproveCompanyAsync(int id, int currentUserId)
         {
             var user = await _context.Users.FindAsync(currentUserId);
-            if(user == null || user.RoleId != (int)enRoles.SuperAdmin)
+            if (user == null || user.RoleId != (int)enRoles.SuperAdmin)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "Unauthorized to approve company."
-                };
+                return Error.Forbidden(ErrorCodes.UnauthorizedAccess, "Unauthorized to approve company.");
             }
 
             var company = await _context.Companies.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == id);
 
             if (company == null || company.IsDeleted)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.CompanyNotFound,
-                    DevMessage = "Company not found."
-                };
+                return Error.NotFound(ErrorCodes.CompanyNotFound, "Company not found.");
             }
 
             company.IsApproved = true;
@@ -367,48 +324,36 @@ namespace summer_training_app.Services.Implementations
             company.ApprovedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-            return null;
+            return Result.Success();
         }
 
-        public async Task<ApiErrorResponseDTO?> DeleteCompanyAsync(int id)
+        public async Task<Result> DeleteCompanyAsync(int id)
         {
             var company = await _context.Companies.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == id);
 
             if (company == null || company.IsDeleted)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.CompanyNotFound,
-                    DevMessage = "Company not found."
-                };
+                return Error.NotFound(ErrorCodes.CompanyNotFound, "Company not found.");
             }
 
             bool hasLinkedUsers = await _context.CompanyRepresentatives.AnyAsync(cr => cr.CompanyId == id);
             if (hasLinkedUsers)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.CompanyHasLinkedUsers,
-                    DevMessage = "Cannot delete this company because it has linked users."
-                };
+                return Error.Conflict(ErrorCodes.CompanyHasLinkedUsers, "Cannot delete this company because it has linked users.");
             }
 
             company.IsDeleted = true;
             await _context.SaveChangesAsync();
 
-            return null;
+            return Result.Success();
         }
 
-        public async Task<(int CollegeId, ApiErrorResponseDTO? Error)> CreateCollegeAsync(CreateCollegeDto dto)
+        public async Task<Result<int>> CreateCollegeAsync(CreateCollegeDto dto)
         {
             var college = await _context.Colleges.FirstOrDefaultAsync(c => c.CollegeName == dto.Name);
             if (college != null)
             {
-                return (0, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.DuplicateCollegeName,
-                    DevMessage = "College name already exists."
-                });
+                return Error.Conflict(ErrorCodes.DuplicateCollegeName, "College name already exists.");
             }
             
             college = new College
@@ -421,10 +366,10 @@ namespace summer_training_app.Services.Implementations
             _context.Colleges.Add(college);
             await _context.SaveChangesAsync();
 
-            return (college.Id, null);
+            return college.Id;
         }
 
-        public async Task<(CollegeDetailsDto? Data, ApiErrorResponseDTO? Error)> GetCollegeByIdAsync(int id)
+        public async Task<Result<CollegeDetailsDto>> GetCollegeByIdAsync(int id)
         {
             var college = await _context.Colleges
                 .Include(c => c.StudentProfiles)
@@ -433,14 +378,10 @@ namespace summer_training_app.Services.Implementations
                 .FirstOrDefaultAsync(c => c.Id == id);
             if (college == null)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.CollegeNotFound,
-                    DevMessage = "College not found."
-                });
+                return Error.NotFound(ErrorCodes.CollegeNotFound, "College not found.");
             }
 
-            return (new CollegeDetailsDto
+            return new CollegeDetailsDto
             {
                 Id = college.Id,
                 Name = college.CollegeName,
@@ -449,20 +390,16 @@ namespace summer_training_app.Services.Implementations
                 CreatedAt = college.CreatedAt,
                 IsActive = !college.IsDeleted,
                 TotalStudents = college.StudentProfiles.Count()
-            }, null);
+            };
         }
 
-        public async Task<ApiErrorResponseDTO?> UpdateCollegeAsync(int id, CreateCollegeDto dto)
+        public async Task<Result> UpdateCollegeAsync(int id, CreateCollegeDto dto)
         {
             var college = await _context.Colleges.FindAsync(id);
 
             if (college == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.CollegeNotFound,
-                    DevMessage = "College not found."
-                };
+                return Error.NotFound(ErrorCodes.CollegeNotFound, "College not found.");
             }
 
             college.CollegeName = dto.Name;
@@ -473,20 +410,16 @@ namespace summer_training_app.Services.Implementations
             }
 
             await _context.SaveChangesAsync();
-            return null;
+            return Result.Success();
         }
         
-        public async Task<ApiErrorResponseDTO?> ToggleCollegeStatusAsync(int id)
+        public async Task<Result> ToggleCollegeStatusAsync(int id)
         {
             var college = await _context.Colleges.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == id);
 
             if (college == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.CollegeNotFound,
-                    DevMessage = "College not found."
-                };
+                return Error.NotFound(ErrorCodes.CollegeNotFound, "College not found.");
             }
 
             if (!college.IsDeleted)
@@ -495,30 +428,22 @@ namespace summer_training_app.Services.Implementations
                                       await _context.StudentProfiles.AnyAsync(sp => sp.CollegeId == id);
                 if (hasLinkedUsers)
                 {
-                    return new ApiErrorResponseDTO
-                    {
-                        Code = ErrorCodes.CollegeHasLinkedUsers,
-                        DevMessage = "Cannot deactivate this college because it has linked users."
-                    };
+                    return Error.Conflict(ErrorCodes.CollegeHasLinkedUsers, "Cannot deactivate this college because it has linked users.");
                 }
             }
 
             college.IsDeleted = !college.IsDeleted;
             await _context.SaveChangesAsync();
-            return null;
+            return Result.Success();
         }
 
-        public async Task<ApiErrorResponseDTO?> DeleteCollegeAsync(int id)
+        public async Task<Result> DeleteCollegeAsync(int id)
         {
             var college = await _context.Colleges.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == id);
 
             if (college == null || college.IsDeleted)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.CollegeNotFound,
-                    DevMessage = "College not found or already deleted."
-                };
+                return Error.NotFound(ErrorCodes.CollegeNotFound, "College not found or already deleted.");
             }
 
             bool hasLinkedUsers = await _context.CollegeRepresentatives.AnyAsync(cr => cr.CollegeId == id) ||
@@ -526,17 +451,13 @@ namespace summer_training_app.Services.Implementations
 
             if (hasLinkedUsers)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.CollegeHasLinkedUsers,
-                    DevMessage = "Cannot delete this college because it has linked users."
-                };
+                return Error.Conflict(ErrorCodes.CollegeHasLinkedUsers, "Cannot delete this college because it has linked users.");
             }
 
             college.IsDeleted = true;
             await _context.SaveChangesAsync();
 
-            return null;
+            return Result.Success();
         }
 
         public async Task<List<PendingCompanyRequestDto>> GetPendingCompanyRequests()
@@ -577,9 +498,10 @@ namespace summer_training_app.Services.Implementations
                 })
                 .ToListAsync();
         }
-        public async Task<UpgradeRequestDetailsDto?> GetUpgradeRequestByIdAsync(Guid publicId)
+
+        public async Task<Result<UpgradeRequestDetailsDto>> GetUpgradeRequestByIdAsync(Guid publicId)
         {
-            return await _context.RoleUpgradeRequests
+            var request = await _context.RoleUpgradeRequests
                 .Include(r => r.User)
                 .Include(r => r.RequestedRole)
                 .Include(r => r.College)
@@ -605,9 +527,16 @@ namespace summer_training_app.Services.Implementations
                     ReviewedByName = r.ReviewedBy != null ? r.ReviewedBy.Name : null
                 })
                 .FirstOrDefaultAsync();
+
+            if (request == null)
+            {
+                return Error.NotFound(ErrorCodes.UpgradeRequestNotFound, "Upgrade request not found.");
+            }
+
+            return request;
         }
 
-        public async Task<ApiErrorResponseDTO?> ApproveUpgradeRequestAsync(Guid publicId, int reviewerUserId)
+        public async Task<Result> ApproveUpgradeRequestAsync(Guid publicId, int reviewerUserId)
         {
             var request = await _context.RoleUpgradeRequests
                 .Include(r => r.User)
@@ -615,66 +544,29 @@ namespace summer_training_app.Services.Implementations
 
             if (request == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UpgradeRequestNotFound,
-                    DevMessage = "Upgrade request not found."
-                };
+                return Error.NotFound(ErrorCodes.UpgradeRequestNotFound, "Upgrade request not found.");
             }
 
             if (request.Status != enRequestStatus.Pending)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UpgradeRequestAlreadyProcessed,
-                    DevMessage = "This upgrade request has already been processed."
-                };
+                return Error.Validation(ErrorCodes.UpgradeRequestAlreadyProcessed, "This upgrade request has already been processed.");
             }
 
             if (request.RequestedRoleId != (int)enRoles.CollegeRep &&
                 request.RequestedRoleId != (int)enRoles.CompanyRep &&
                 request.RequestedRoleId != (int)enRoles.Student)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.InvalidRequestedRole,
-                    DevMessage = "Invalid requested role for upgrade."
-                };
+                return Error.Validation(ErrorCodes.InvalidRequestedRole, "Invalid requested role for upgrade.");
             }
-            
-            //switch(request.RequestedRoleId)
-            //{
-            //    case (int)enRoles.CollegeRep:
-            //        return UpgradeToCollegeRep(request, reviewerUserId);
-                    
-            //        break;
-            //    case (int)enRoles.CompanyRep:
-            //        return UpgradeToCompanyRep(request, reviewerUserId);
-                    
-            //        break;
-            //    case (int)enRoles.Student:
-            //        return UpgradeToStudent(request, reviewerUserId);
-            //        break;
-            //}
 
-
-            // Validate that the required association ID exists before approving
             if ((request.RequestedRoleId == (int)enRoles.CollegeRep || request.RequestedRoleId == (int)enRoles.Student) && !request.CollegeId.HasValue)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.InvalidCollegeId,
-                    DevMessage = "Cannot approve: the upgrade request does not specify a College ID."
-                };
+                return Error.Validation(ErrorCodes.InvalidCollegeId, "Cannot approve: the upgrade request does not specify a College ID.");
             }
 
             if (request.RequestedRoleId == (int)enRoles.CompanyRep && !request.CompanyId.HasValue)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.InvalidCompanyId,
-                    DevMessage = "Cannot approve: the upgrade request does not specify a Company ID."
-                };
+                return Error.Validation(ErrorCodes.InvalidCompanyId, "Cannot approve: the upgrade request does not specify a Company ID.");
             }
 
             var strategy = _context.Database.CreateExecutionStrategy();
@@ -748,51 +640,16 @@ namespace summer_training_app.Services.Implementations
                 }
             });
 
-            return null;
+            return Result.Success();
         }
 
-        //private void UpgradeToCompanyRep( RoleUpgradeRequest request, int reviewerUserId)
-        //{
-        //    throw new NotImplementedException();
-        //}
-
-        //private async Task<ApiErrorResponseDTO?> UpgradeToCollegeRep( RoleUpgradeRequest request, int reviewerUserId)
-        //{
-        //    if (!request.CollegeId.HasValue)
-        //    {
-        //        return new ApiErrorResponseDTO
-        //        {
-        //            Code = ErrorCodes.InvalidCollegeId,
-        //            DevMessage = "Cannot approve: the upgrade request does not specify a College ID."
-        //        };
-        //    }
-        //    return null;
-        //}
-
-        //private async Task<ApiErrorResponseDTO?> UpgradeToStudent( RoleUpgradeRequest request, int reviewerUserId)
-        //{
-        //    if (!request.CollegeId.HasValue)
-        //    {
-        //        return new ApiErrorResponseDTO
-        //        {
-        //            Code = ErrorCodes.InvalidCollegeId,
-        //            DevMessage = "Cannot approve: the upgrade request does not specify a College ID."
-        //        };
-        //    }
-        //    return null;
-        //}
-
-        public async Task<ApiErrorResponseDTO?> RejectUpgradeRequestAsync(Guid publicId, string? comment, int reviewerUserId)
+        public async Task<Result> RejectUpgradeRequestAsync(Guid publicId, string? comment, int reviewerUserId)
         {
             var request = await _context.RoleUpgradeRequests.FirstOrDefaultAsync(r => r.PublicId == publicId);
 
             if (request == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UpgradeRequestNotFound,
-                    DevMessage = "Upgrade request not found."
-                };
+                return Error.NotFound(ErrorCodes.UpgradeRequestNotFound, "Upgrade request not found.");
             }
 
             request.Status = enRequestStatus.Rejected;
@@ -801,31 +658,24 @@ namespace summer_training_app.Services.Implementations
             request.Comment = comment;
             await _context.SaveChangesAsync();
 
-            return null;
+            return Result.Success();
         }
 
-        public async Task<(string? PhysicalPath, string? ContentType, string? FileName, ApiErrorResponseDTO? Error)> GetProofFileAsync(Guid publicId)
+        public async Task<Result<(string PhysicalPath, string ContentType, string FileName)>> GetProofFileAsync(Guid publicId)
         {
             var request = await _context.RoleUpgradeRequests
                 .AsNoTracking()
                 .FirstOrDefaultAsync(r => r.PublicId == publicId);
 
             if (request == null || string.IsNullOrEmpty(request.ProofFilePath))
-                return (null, null, null, new ApiErrorResponseDTO 
-                { 
-                    Code = ErrorCodes.FileNotFound, 
-                    DevMessage = "Request or file not found." 
-                });
+            {
+                return Error.NotFound(ErrorCodes.FileNotFound, "Request or file not found.");
+            }
 
-            var result = await _filesService.DownloadFileAsync(request.ProofFilePath);
-
-            if (result.Error != null)
-                return (null, null, null, result.Error);
-
-            return (result.Data.Value.PhysicalPath, result.Data.Value.ContentType, result.Data.Value.FileName, null);
+            return await _filesService.DownloadFileAsync(request.ProofFilePath);
         }
 
-        public async Task<(AdminUserDetailsDto? Data, ApiErrorResponseDTO? Error)> GetUserDetailsAsync(Guid publicId)
+        public async Task<Result<AdminUserDetailsDto>> GetUserDetailsAsync(Guid publicId)
         {
             var user = await _context.Users
                 .AsNoTracking()
@@ -837,18 +687,14 @@ namespace summer_training_app.Services.Implementations
 
             if (user == null)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UserNotFound,
-                    DevMessage = "User not found."
-                });
+                return Error.NotFound(ErrorCodes.UserNotFound, "User not found.");
             }
 
             string? collegeName = user.StudentProfile?.College?.CollegeName 
                                ?? user.CollegeRepresentative?.College?.CollegeName;
             string? companyName = user.CompanyRepresentative?.Company?.CompanyName;
 
-            return (new AdminUserDetailsDto
+            return new AdminUserDetailsDto
             {
                 Id = user.PublicId,
                 Username = user.Username,
@@ -860,32 +706,28 @@ namespace summer_training_app.Services.Implementations
                 CreatedAt = user.CreatedAt,
                 CollegeName = collegeName,
                 CompanyName = companyName
-            }, null);
+            };
         }
 
-        public async Task<ApiErrorResponseDTO?> AdminResetUserPasswordAsync(Guid publicId, AdminResetPasswordDto dto)
+        public async Task<Result> AdminResetUserPasswordAsync(Guid publicId, AdminResetPasswordDto dto)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.PublicId == publicId);
             if (user == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UserNotFound,
-                    DevMessage = "User not found."
-                };
+                return Error.NotFound(ErrorCodes.UserNotFound, "User not found.");
             }
 
             user.PasswordHash = BCrypt.Net.BCrypt.EnhancedHashPassword(dto.NewPassword, 12);
             user.LastUpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
-            return null;
+            return Result.Success();
         }
 
         public async Task<List<CompaniesListDto>> GetAllCompaniesAsync()
         {
             return await _context.Companies
-                .Include(c=>c.TrainingRecords)
+                .Include(c => c.TrainingRecords)
                 .AsNoTracking()
                 .IgnoreQueryFilters()
                 .Include(c => c.ApprovedByUser)
@@ -896,7 +738,7 @@ namespace summer_training_app.Services.Implementations
                     Address = c.CompanyAddress,
                     IsApproved = c.IsApproved,
                     IsActive = !c.IsDeleted,
-                    TotalStudents = c.TrainingRecords.Select(tr => tr.Status == enTrainingStatus.Active).Count()
+                    TotalStudents = c.TrainingRecords.Count(tr => tr.Status == enTrainingStatus.Active)
                 })
                 .ToListAsync();
         }

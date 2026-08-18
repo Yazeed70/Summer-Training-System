@@ -1,18 +1,15 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using summer_training_app.Common.Constants;
+using summer_training_app.Common.Results;
 using summer_training_app.Data;
 using summer_training_app.DTOs.Dashboard;
-using summer_training_app.DTOs.Shared;
 using summer_training_app.DTOs.Training;
 using summer_training_app.Entities.Core;
 using summer_training_app.Entities.Enums;
-using summer_training_app.Migrations;
 using summer_training_app.Services.Interfaces;
 
 namespace summer_training_app.Services.Implementations
@@ -28,48 +25,33 @@ namespace summer_training_app.Services.Implementations
             _filesService = filesService;
         }
 
-        public async Task<(Guid RequestPublicId, ApiErrorResponseDTO? Error)> SubmitRequestAsync(SubmitTrainingRequestDto dto, int studentId)
+        public async Task<Result<Guid>> SubmitRequestAsync(SubmitTrainingRequestDto dto, int studentId)
         {
-
             var studentUser = await _context.StudentProfiles
                 .FirstOrDefaultAsync(u => u.UserId == studentId);
 
             if (studentUser == null)
             {
-                return (Guid.Empty, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.InvalidCollegeId,
-                    DevMessage = "User is not associated with a valid college."
-                });
+                return Error.Validation(ErrorCodes.InvalidCollegeId, "User is not associated with a valid college.");
             }
-
 
             var existingRequest = await _context.TrainingRequests
                 .FirstOrDefaultAsync(tr => tr.StudentId == studentId && tr.Status == enRequestStatus.Pending);
 
             if (existingRequest != null)
             {
-                return (Guid.Empty, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.ExistingPendingRequest,
-                    DevMessage = "You already have a pending request."
-                });
+                return Error.Conflict(ErrorCodes.ExistingPendingRequest, "You already have a pending request.");
             }
 
             if (dto.CompanyId == null && string.IsNullOrWhiteSpace(dto.SuggestedCompanyName))
             {
-                return (Guid.Empty, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.InvalidProofFile,
-                    DevMessage = "You must select a company from the list or enter a suggested company name."
-                });
+                return Error.Validation(ErrorCodes.InvalidProofFile, "You must select a company from the list or enter a suggested company name.");
             }
 
             var uploadResult = await _filesService.UploadFileAsync(dto.AcceptanceLetter, "acceptance_letters");
-
-            if (uploadResult.Error != null)
+            if (uploadResult.IsFailure)
             {
-                return (Guid.Empty, uploadResult.Error);
+                return uploadResult.Error;
             }
 
             var request = new TrainingRequest
@@ -81,7 +63,7 @@ namespace summer_training_app.Services.Implementations
                 EndDate = dto.EndDate,
                 AcademicYear = dto.AcademicYear,
                 Semester = dto.Semester,
-                AcceptanceLetterPath = uploadResult.Data.Value.FilePath,
+                AcceptanceLetterPath = uploadResult.Value.FilePath,
                 Status = enRequestStatus.Pending,
                 CreatedAt = DateTime.UtcNow
             };
@@ -90,22 +72,17 @@ namespace summer_training_app.Services.Implementations
             {
                 _context.TrainingRequests.Add(request);
                 await _context.SaveChangesAsync();
-
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                await _filesService.DeleteFile(uploadResult.Data.Value.FilePath);
-                return (Guid.Empty, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.DatabaseError,
-                    DevMessage = $"An error occurred while saving the training request: {ex.Message}"
-                });
+                await _filesService.DeleteFile(uploadResult.Value.FilePath);
+                return Error.Failure(ErrorCodes.DatabaseError, "An error occurred while saving the training request.");
             }
 
-            return (request.PublicId, null);
+            return request.PublicId;
         }
 
-        public async Task<(List<PendingTrainingRequestDto>? Data, ApiErrorResponseDTO? Error)> GetStudentPendingRequestsAsync(int studentId)
+        public async Task<Result<List<PendingTrainingRequestDto>>> GetStudentPendingRequestsAsync(int studentId)
         {
             var requests = await _context.TrainingRequests
                 .Where(tr => tr.StudentId == studentId)
@@ -123,17 +100,16 @@ namespace summer_training_app.Services.Implementations
                 })
                 .ToListAsync();
 
-            return (requests ?? new List<PendingTrainingRequestDto>(), null);
+            return requests;
         }
-        public async Task<(MyTrainingRequestDto? Data, ApiErrorResponseDTO? Error)> GetPendingRequestAsync(Guid requestPublicId)
-        {
 
+        public async Task<Result<MyTrainingRequestDto>> GetPendingRequestAsync(Guid requestPublicId)
+        {
             var request = await _context.TrainingRequests
                 .Where(tr => tr.PublicId == requestPublicId)
                 .Select(tr => new MyTrainingRequestDto
                 {
                     Id = tr.PublicId,
-
                     StudentName = tr.Student.User.Name,
                     CompanyName = tr.Company != null ? tr.Company.CompanyName : (tr.SuggestedCompanyName ?? "Other"),
                     StartDate = tr.StartDate,
@@ -149,26 +125,19 @@ namespace summer_training_app.Services.Implementations
                 })
                 .FirstOrDefaultAsync();
 
-            if(request == null)
+            if (request == null)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.RequestNotFound,
-                    DevMessage = "The specified training request was not found."
-                });
+                return Error.NotFound(ErrorCodes.RequestNotFound, "The specified training request was not found.");
             }
 
-            return (request, null);
+            return request;
         }
-        public async Task<(List<PendingTrainingRequestDto>? Data, ApiErrorResponseDTO? Error)> GetCollegePendingRequestsAsync(int collegeId, int userId)
+
+        public async Task<Result<List<PendingTrainingRequestDto>>> GetCollegePendingRequestsAsync(int collegeId, int userId)
         {
-            if(!await _context.CollegeRepresentatives.AnyAsync(u => u.UserId == userId && u.CollegeId == collegeId))
+            if (!await _context.CollegeRepresentatives.AnyAsync(u => u.UserId == userId && u.CollegeId == collegeId))
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User does not have access to this college's requests."
-                });
+                return Error.Forbidden(ErrorCodes.UnauthorizedAccess, "User does not have access to this college's requests.");
             }
 
             var requests = await _context.TrainingRequests
@@ -187,21 +156,18 @@ namespace summer_training_app.Services.Implementations
                 })
                 .ToListAsync();
 
-            return (requests ?? new List<PendingTrainingRequestDto>(), null);
+            return requests;
         }
 
-        public async Task<ApiErrorResponseDTO?> ProcessRequestAsync(ProcessTrainingRequestDto dto, int reviewerUserId)
+        public async Task<Result> ProcessRequestAsync(ProcessTrainingRequestDto dto, int reviewerUserId)
         {
             var reviewerUser = await _context.CollegeRepresentatives
                 .Include(cr => cr.College)
                 .FirstOrDefaultAsync(u => u.UserId == reviewerUserId);
+
             if (reviewerUser == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "You are not authorized to process this request."
-                };
+                return Error.Forbidden(ErrorCodes.UnauthorizedAccess, "You are not authorized to process this request.");
             }
 
             var request = await _context.TrainingRequests
@@ -210,24 +176,16 @@ namespace summer_training_app.Services.Implementations
 
             if (request == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.RequestNotFound,
-                    DevMessage = "The training request was not found."
-                };
+                return Error.NotFound(ErrorCodes.RequestNotFound, "The training request was not found.");
             }
 
             if (request.Status != enRequestStatus.Pending)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.ExistingPendingRequest,
-                    DevMessage = "This request has already been processed."
-                };
+                return Error.Validation(ErrorCodes.ExistingPendingRequest, "This request has already been processed.");
             }
 
             var strategy = _context.Database.CreateExecutionStrategy();
-            ApiErrorResponseDTO? resultError = null;
+            Error? resultError = null;
 
             await strategy.ExecuteAsync(async () =>
             {
@@ -252,11 +210,7 @@ namespace summer_training_app.Services.Implementations
                     {
                         if (string.IsNullOrWhiteSpace(request.SuggestedCompanyName))
                         {
-                            resultError = new ApiErrorResponseDTO
-                            {
-                                Code = ErrorCodes.CompanyIdMissing,
-                                DevMessage = "Company ID is missing."
-                            };
+                            resultError = Error.Validation(ErrorCodes.CompanyIdMissing, "Company ID is missing.");
                             return;
                         }
 
@@ -294,7 +248,7 @@ namespace summer_training_app.Services.Implementations
                         var company = await _context.Companies.FindAsync(request.CompanyId);
                         if (company == null)
                         {
-                            resultError = new ApiErrorResponseDTO { Code = ErrorCodes.CompanyIdMissing, DevMessage = "Company ID is missing." };
+                            resultError = Error.NotFound(ErrorCodes.CompanyIdMissing, "Company ID is missing.");
                             return;
                         }
 
@@ -325,10 +279,15 @@ namespace summer_training_app.Services.Implementations
                 }
             });
 
-            return resultError;
+            if (resultError != null)
+            {
+                return resultError;
+            }
+
+            return Result.Success();
         }
 
-        public async Task<ApiErrorResponseDTO?> UpdateTrainingStatusAsync(UpdateTrainingStatusDto dto, int userId)
+        public async Task<Result> UpdateTrainingStatusAsync(UpdateTrainingStatusDto dto, int userId)
         {
             var training = await _context.TrainingRecords
                 .Include(tr => tr.Student)
@@ -336,38 +295,25 @@ namespace summer_training_app.Services.Implementations
 
             if (training == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.TrainingRequestNotFound,
-                    DevMessage = "Training record not found."
-                };
+                return Error.NotFound(ErrorCodes.TrainingRequestNotFound, "Training record not found.");
             }
             
             bool isCollegeAdmin = await _context.CollegeRepresentatives.AnyAsync(cr => cr.UserId == userId && cr.CollegeId == training.Student.CollegeId);
 
             if (!isCollegeAdmin)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "You do not have permission to update this training record."
-                };
+                return Error.Forbidden(ErrorCodes.UnauthorizedAccess, "You do not have permission to update this training record.");
             }
 
-            // Only Active training records can have their status changed
             if (training.Status != enTrainingStatus.Active || dto.NewStatus == enTrainingStatus.NotStarted)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.TrainingIsNotActive,
-                    DevMessage = $"Cannot update status. Training is currently '{training.Status}' and is not active."
-                };
+                return Error.Validation(ErrorCodes.TrainingIsNotActive, $"Cannot update status. Training is currently '{training.Status}' and is not active.");
             }
             
             training.Status = dto.NewStatus;
             await _context.SaveChangesAsync();
 
-            return null;
+            return Result.Success();
         }
     }
 }

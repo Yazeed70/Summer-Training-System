@@ -48,6 +48,7 @@ namespace summer_training_app.Common.Constants
         public const string CompanyNotFound = "COMPANY_NOT_FOUND";
         public const string CompanyHasLinkedUsers = "COMPANY_HAS_LINKED_USERS";
         public const string UserAlreadyRepresentative = "USER_ALREADY_REPRESENTATIVE";
+        public const string CompanyIsNotApproved = "COMPANY_IS_NOT_APPROVED";
 
         // Errors related to colleges
         public const string InvalidCollegeId = "INVALID_COLLEGE_ID";
@@ -63,6 +64,7 @@ namespace summer_training_app.Common.Constants
         // Errors related to Reports and Templates
         public const string TemplateNotFound = "TEMPLATE_NOT_FOUND";
         public const string ReportAlreadySubmitted = "REPORT_ALREADY_SUBMITTED";
+        public const string ReportAlreadyEvaluated = "REPORT_ALREADY_EVALUATED";
         public const string TemplateHasSubmissions = "TEMPLATE_HAS_SUBMISSIONS";
         public const string StudentReportNotFound = "STUDENT_REPORT_NOT_FOUND";
         public const string TemplateTitleMissing = "TEMPLATE_TITLE_MISSING";

@@ -1,14 +1,13 @@
-﻿using summer_training_app.DTOs.Auth;
-using summer_training_app.DTOs.Shared;
+using System.Threading.Tasks;
+using summer_training_app.Common.Results;
+using summer_training_app.DTOs.Auth;
+
 namespace summer_training_app.Services.Interfaces
 {
     public interface IAuthService
     {
-        public Task<(string? Token, ApiErrorResponseDTO? Error)> RegisterAsync(RegisterRequestDto registerDto);
-        public Task<(string? Token, ApiErrorResponseDTO? Error)> LoginAsync(LoginRequestDto loginDto);
-        public Task<ApiErrorResponseDTO?>                        UpdateProfileAsync(UpdateProfileDto updateProfileDto, int userId);
-
-        //public Task<(string? Token, ApiErrorResponseDTO? Error)> DeleteProfileAsync(string profileId);
-        //public Task<(string? Token, ApiErrorResponseDTO? Error)> GetProfileAsync(string profileId);
+        Task<Result<string>> RegisterAsync(RegisterRequestDto registerDto);
+        Task<Result<string>> LoginAsync(LoginRequestDto loginDto);
+        Task<Result> UpdateProfileAsync(UpdateProfileDto updateProfileDto, int userId);
     }
 }

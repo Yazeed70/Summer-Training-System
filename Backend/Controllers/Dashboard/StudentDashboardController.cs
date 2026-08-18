@@ -1,9 +1,8 @@
+using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using summer_training_app.Common.Constants;
 using summer_training_app.DTOs.Dashboard;
-using summer_training_app.DTOs.Shared;
 using summer_training_app.Extensions;
 using summer_training_app.Services.Interfaces;
 
@@ -27,21 +26,16 @@ namespace summer_training_app.Controllers.Dashboard
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _studentDashboardService.GetMyProfileAsync(userId.Value);
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.UserNotFound)
-                    return NotFound(result.Error);
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
-            return Ok(result.Data);
+
+            return Ok(result.Value);
         }
 
         [HttpPut("profile")]
@@ -50,20 +44,15 @@ namespace summer_training_app.Controllers.Dashboard
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
-            var error = await _studentDashboardService.UpdateMyProfileAsync(dto, userId.Value);
-            if (error != null)
+            var result = await _studentDashboardService.UpdateMyProfileAsync(dto, userId.Value);
+            if (result.IsFailure)
             {
-                if (error.Code == ErrorCodes.UserNotFound)
-                    return NotFound(error);
-                return BadRequest(error);
+                return this.ToProblemDetails(result.Error);
             }
+
             return Ok(new { message = "Student profile updated successfully." });
         }
 
@@ -73,19 +62,16 @@ namespace summer_training_app.Controllers.Dashboard
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _studentDashboardService.GetTrainingHistoryAsync(userId.Value);
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
-            return Ok(result.Data);
+
+            return Ok(result.Value);
         }
 
         [HttpGet("reports-summary")]
@@ -94,19 +80,16 @@ namespace summer_training_app.Controllers.Dashboard
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _studentDashboardService.GetReportsSummaryAsync(userId.Value);
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
-            return Ok(result.Data);
+
+            return Ok(result.Value);
         }
 
         [HttpGet("college-advisor")]
@@ -115,21 +98,16 @@ namespace summer_training_app.Controllers.Dashboard
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _studentDashboardService.GetCollegeAdvisorAsync(userId.Value);
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.UserNotFound)
-                    return NotFound(result.Error);
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
-            return Ok(result.Data);
+
+            return Ok(result.Value);
         }
 
         [HttpGet("college-documents")]
@@ -138,21 +116,16 @@ namespace summer_training_app.Controllers.Dashboard
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _studentDashboardService.GetCollegeDocumentsAsync(userId.Value);
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.UserNotFound)
-                    return NotFound(result.Error);
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
-            return Ok(result.Data);
+
+            return Ok(result.Value);
         }
 
         [HttpGet("proof/{publicId}")]
@@ -161,22 +134,16 @@ namespace summer_training_app.Controllers.Dashboard
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return Unauthorized(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User identity is invalid or missing."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _studentDashboardService.GetMyProofFileAsync(publicId, userId.Value);
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.FileNotFound)
-                    return NotFound(result.Error);
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return PhysicalFile(result.PhysicalPath!, result.ContentType!, result.FileName!);
+            return PhysicalFile(result.Value.PhysicalPath, result.Value.ContentType, result.Value.FileName);
         }
 
         [HttpGet("college-document/{documentId}")]
@@ -185,22 +152,16 @@ namespace summer_training_app.Controllers.Dashboard
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return Unauthorized(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User identity is invalid or missing."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _studentDashboardService.DownloadCollegeDocumentAsync(documentId, userId.Value);
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.FileNotFound || result.Error.Code == ErrorCodes.DocumentNotFound)
-                    return NotFound(result.Error);
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return PhysicalFile(result.PhysicalPath!, result.ContentType!, result.FileName!);
+            return PhysicalFile(result.Value.PhysicalPath, result.Value.ContentType, result.Value.FileName);
         }
     }
 }

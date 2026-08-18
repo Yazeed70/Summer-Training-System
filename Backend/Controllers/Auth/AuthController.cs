@@ -1,24 +1,11 @@
-using BCrypt.Net;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using summer_training_app.Common.Constants;
-using summer_training_app.Data;
-using summer_training_app.DTOs;
 using summer_training_app.DTOs.Auth;
-using summer_training_app.DTOs.Shared;
-using summer_training_app.Entities.Core;
-using summer_training_app.Entities.Enums;
 using summer_training_app.Extensions;
-using summer_training_app.Services.Implementations;
 using summer_training_app.Services.Interfaces;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 
-namespace summer_training_app.Controllers
+namespace summer_training_app.Controllers.Auth
 {
     [Route("api/[controller]")]
     [ApiController]
@@ -36,14 +23,12 @@ namespace summer_training_app.Controllers
         {
             var result = await _authService.LoginAsync(request);
 
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                if (result.Error.Code == ErrorCodes.UserNotFound || result.Error.Code == ErrorCodes.UserInactive)
-                    return Unauthorized(result.Error);
-
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
-            return Ok(new { token = result.Token });
+
+            return Ok(new { token = result.Value });
         }
 
         [HttpPost("register")]
@@ -51,12 +36,12 @@ namespace summer_training_app.Controllers
         {
             var result = await _authService.RegisterAsync(request);
 
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(new { token = result.Token });
+            return Ok(new { token = result.Value });
         }
 
         [HttpPut("update-profile")]
@@ -66,18 +51,14 @@ namespace summer_training_app.Controllers
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _authService.UpdateProfileAsync(dto, userId.Value);
 
-            if (result != null)
+            if (result.IsFailure)
             {
-                return BadRequest(result);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok();

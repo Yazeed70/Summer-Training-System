@@ -88,9 +88,13 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
+// --- Exception Handling & Problem Details ---
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<summer_training_app.Common.Exceptions.GlobalExceptionHandler>();
+
 var app = builder.Build();
 
-app.UseMiddleware<summer_training_app.Common.Middleware.GlobalExceptionHandlerMiddleware>();
+app.UseExceptionHandler();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

@@ -4,10 +4,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using summer_training_app.Common.Constants;
+using summer_training_app.Common.Results;
 using summer_training_app.Data;
 using summer_training_app.DTOs.Auth;
 using summer_training_app.DTOs.Dashboard;
-using summer_training_app.DTOs.Shared;
 using summer_training_app.Entities.Core;
 using summer_training_app.Entities.Enums;
 using summer_training_app.Services.Interfaces;
@@ -30,7 +30,7 @@ namespace summer_training_app.Services.Implementations
             _authService = authService;
         }
 
-        public async Task<(UserProfileResponseDto? Data, ApiErrorResponseDTO? Error)> GetUserProfileAsync(int userId)
+        public async Task<Result<UserProfileResponseDto>> GetUserProfileAsync(int userId)
         {
             var userProfile = await _context.Users
                 .Include(u => u.Role)
@@ -50,40 +50,28 @@ namespace summer_training_app.Services.Implementations
 
             if (userProfile == null)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UserNotFound,
-                    DevMessage = "User not found."
-                });
+                return Error.NotFound(ErrorCodes.UserNotFound, "User not found.");
             }
 
-            return (userProfile, null);
+            return userProfile;
         }
 
-        public async Task<ApiErrorResponseDTO?> UpdateUserProfileAsync(UpdateProfileDto dto, int userId)
+        public async Task<Result> UpdateUserProfileAsync(UpdateProfileDto dto, int userId)
         {
             return await _authService.UpdateProfileAsync(dto, userId);
         }
 
-        public async Task<ApiErrorResponseDTO?> SubmitUpgradeRequestAsync(UpgradeRoleDto dto, int userId)
+        public async Task<Result> SubmitUpgradeRequestAsync(UpgradeRoleDto dto, int userId)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UserNotFound,
-                    DevMessage = "User not found."
-                };
+                return Error.NotFound(ErrorCodes.UserNotFound, "User not found.");
             }
 
             if (user.RoleId != (int)enRoles.BasicUser)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.InvalidRole,
-                    DevMessage = "Only users with BasicUser role can submit upgrade requests."
-                };
+                return Error.Validation(ErrorCodes.InvalidRole, "Only users with BasicUser role can submit upgrade requests.");
             }
 
             var existingPendingRequest = await _context.RoleUpgradeRequests
@@ -91,32 +79,20 @@ namespace summer_training_app.Services.Implementations
 
             if (existingPendingRequest != null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.ExistingPendingRequest,
-                    DevMessage = "You already have a pending role upgrade request."
-                };
+                return Error.Conflict(ErrorCodes.ExistingPendingRequest, "You already have a pending role upgrade request.");
             }
 
             if (dto.RequestedRoleId == (int)enRoles.Student || dto.RequestedRoleId == (int)enRoles.CollegeRep)
             {
                 if (!dto.CollegeId.HasValue)
                 {
-                    return new ApiErrorResponseDTO
-                    {
-                        Code = ErrorCodes.CollegeNotFound,
-                        DevMessage = "College selection is required for this role upgrade."
-                    };
+                    return Error.Validation(ErrorCodes.CollegeNotFound, "College selection is required for this role upgrade.");
                 }
 
                 var collegeExists = await _context.Colleges.AnyAsync(c => c.Id == dto.CollegeId.Value);
                 if (!collegeExists)
                 {
-                    return new ApiErrorResponseDTO
-                    {
-                        Code = ErrorCodes.CollegeNotFound,
-                        DevMessage = "Specified college was not found."
-                    };
+                    return Error.NotFound(ErrorCodes.CollegeNotFound, "Specified college was not found.");
                 }
             }
 
@@ -124,35 +100,23 @@ namespace summer_training_app.Services.Implementations
             {
                 if (!dto.CompanyId.HasValue)
                 {
-                    return new ApiErrorResponseDTO
-                    {
-                        Code = ErrorCodes.CompanyNotFound,
-                        DevMessage = "Company selection is required for Company Representative role upgrade."
-                    };
+                    return Error.Validation(ErrorCodes.CompanyNotFound, "Company selection is required for Company Representative role upgrade.");
                 }
 
                 var companyExists = await _context.Companies.AnyAsync(c => c.Id == dto.CompanyId.Value);
                 if (!companyExists)
                 {
-                    return new ApiErrorResponseDTO
-                    {
-                        Code = ErrorCodes.CompanyNotFound,
-                        DevMessage = "Specified company was not found."
-                    };
+                    return Error.NotFound(ErrorCodes.CompanyNotFound, "Specified company was not found.");
                 }
             }
 
             var uploadResult = await _filesService.UploadFileAsync(dto.ProofFile, "role_upgrade_proofs");
-            if (uploadResult.Error != null || !uploadResult.Data.HasValue)
+            if (uploadResult.IsFailure)
             {
-                return uploadResult.Error ?? new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.InvalidProofFile,
-                    DevMessage = "Failed to upload proof file."
-                };
+                return uploadResult.Error;
             }
 
-            var relativeFilePath = uploadResult.Data.Value.FilePath;
+            var relativeFilePath = uploadResult.Value.FilePath;
 
             var upgradeRequest = new RoleUpgradeRequest
             {
@@ -171,49 +135,37 @@ namespace summer_training_app.Services.Implementations
                 _context.RoleUpgradeRequests.Add(upgradeRequest);
                 await _context.SaveChangesAsync();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 await _filesService.DeleteFile(relativeFilePath);
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.DatabaseError,
-                    DevMessage = $"An error occurred while saving the request: {ex.Message}"
-                };
+                return Error.Failure(ErrorCodes.DatabaseError, "An error occurred while saving the request.");
             }
 
-            return null;
+            return Result.Success();
         }
 
-        public async Task<ApiErrorResponseDTO?> CancelUpgradeRequestAsync(Guid requestPublicId, int userId)
+        public async Task<Result> CancelUpgradeRequestAsync(Guid requestPublicId, int userId)
         {
             var request = await _context.RoleUpgradeRequests
                 .FirstOrDefaultAsync(r => r.PublicId == requestPublicId && r.UserId == userId);
 
             if (request == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UpgradeRequestNotFound,
-                    DevMessage = "Upgrade request not found or you do not have permission to access it."
-                };
+                return Error.NotFound(ErrorCodes.UpgradeRequestNotFound, "Upgrade request not found or you do not have permission to access it.");
             }
 
             if (request.Status != enRequestStatus.Pending)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UpgradeRequestAlreadyProcessed,
-                    DevMessage = "Only pending upgrade requests can be canceled."
-                };
+                return Error.Validation(ErrorCodes.UpgradeRequestAlreadyProcessed, "Only pending upgrade requests can be canceled.");
             }
 
             request.Status = enRequestStatus.Deleted;
             await _context.SaveChangesAsync();
 
-            return null;
+            return Result.Success();
         }
 
-        public async Task<(UpgradeRequestDetailsDto? Data, ApiErrorResponseDTO? Error)> GetMyUpgradeRequestStatusAsync(int userId)
+        public async Task<Result<UpgradeRequestDetailsDto>> GetMyUpgradeRequestStatusAsync(int userId)
         {
             var latestRequest = await _context.RoleUpgradeRequests
                 .Include(r => r.User)
@@ -243,10 +195,10 @@ namespace summer_training_app.Services.Implementations
                 })
                 .FirstOrDefaultAsync();
 
-            return (latestRequest, null);
+            return latestRequest!;
         }
 
-        public async Task<(List<UpgradeRequestDetailsDto>? Data, ApiErrorResponseDTO? Error)> GetMyUpgradeHistoryAsync(int userId)
+        public async Task<Result<List<UpgradeRequestDetailsDto>>> GetMyUpgradeHistoryAsync(int userId)
         {
             var history = await _context.RoleUpgradeRequests
                 .Include(r => r.User)
@@ -276,7 +228,7 @@ namespace summer_training_app.Services.Implementations
                 })
                 .ToListAsync();
 
-            return (history, null);
+            return history;
         }
 
         public async Task<List<CollegesListDto>> GetAllCollegesDetailsAsync()
@@ -313,7 +265,7 @@ namespace summer_training_app.Services.Implementations
                 .ToListAsync();
         }
 
-        public async Task<(string? PhysicalPath, string? ContentType, string? FileName, ApiErrorResponseDTO? Error)> GetMyProofFileAsync(Guid publicId, int userId)
+        public async Task<Result<(string PhysicalPath, string ContentType, string FileName)>> GetMyProofFileAsync(Guid publicId, int userId)
         {
             var request = await _context.RoleUpgradeRequests
                 .AsNoTracking()
@@ -321,19 +273,10 @@ namespace summer_training_app.Services.Implementations
 
             if (request == null || string.IsNullOrEmpty(request.ProofFilePath))
             {
-                return (null, null, null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.FileNotFound,
-                    DevMessage = "Request or proof file not found."
-                });
+                return Error.NotFound(ErrorCodes.FileNotFound, "Request or proof file not found.");
             }
 
-            var result = await _filesService.DownloadFileAsync(request.ProofFilePath);
-
-            if (result.Error != null)
-                return (null, null, null, result.Error);
-
-            return (result.Data.Value.PhysicalPath, result.Data.Value.ContentType, result.Data.Value.FileName, null);
+            return await _filesService.DownloadFileAsync(request.ProofFilePath);
         }
     }
 }

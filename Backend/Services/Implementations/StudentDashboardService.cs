@@ -1,16 +1,15 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using summer_training_app.Common.Constants;
+using summer_training_app.Common.Results;
 using summer_training_app.Data;
 using summer_training_app.DTOs.Core;
 using summer_training_app.DTOs.Dashboard;
 using summer_training_app.DTOs.Reports;
-using summer_training_app.DTOs.Shared;
 using summer_training_app.DTOs.Training;
 using summer_training_app.Entities.Enums;
 using summer_training_app.Services.Interfaces;
@@ -36,7 +35,7 @@ namespace summer_training_app.Services.Implementations
             _filesService = filesService;
         }
 
-        public async Task<(StudentProfileResponseDto? Data, ApiErrorResponseDTO? Error)> GetMyProfileAsync(int userId)
+        public async Task<Result<StudentProfileResponseDto>> GetMyProfileAsync(int userId)
         {
             var studentProfile = await _context.StudentProfiles
                 .Where(sp => sp.UserId == userId)
@@ -69,26 +68,18 @@ namespace summer_training_app.Services.Implementations
 
             if (studentProfile == null)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UserNotFound,
-                    DevMessage = "Student profile not found."
-                });
+                return Error.NotFound(ErrorCodes.UserNotFound, "Student profile not found.");
             }
 
-            return (studentProfile, null);
+            return studentProfile;
         }
 
-        public async Task<ApiErrorResponseDTO?> UpdateMyProfileAsync(UpdateStudentProfileDto dto, int userId)
+        public async Task<Result> UpdateMyProfileAsync(UpdateStudentProfileDto dto, int userId)
         {
             var studentProfile = await _context.StudentProfiles.FirstOrDefaultAsync(sp => sp.UserId == userId);
             if (studentProfile == null)
             {
-                return new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UserNotFound,
-                    DevMessage = "Student profile not found."
-                };
+                return Error.NotFound(ErrorCodes.UserNotFound, "Student profile not found.");
             }
 
             if (dto.UniversityIdNumber != null)
@@ -101,10 +92,10 @@ namespace summer_training_app.Services.Implementations
                 studentProfile.GPA = dto.GPA.Value;
 
             await _context.SaveChangesAsync();
-            return null;
+            return Result.Success();
         }
 
-        public async Task<(List<StudentTrainingHistoryDto>? Data, ApiErrorResponseDTO? Error)> GetTrainingHistoryAsync(int userId)
+        public async Task<Result<List<StudentTrainingHistoryDto>>> GetTrainingHistoryAsync(int userId)
         {
             var history = await _context.TrainingRecords
                 .Include(tr => tr.Company)
@@ -123,15 +114,15 @@ namespace summer_training_app.Services.Implementations
                 })
                 .ToListAsync();
 
-            return (history, null);
+            return history;
         }
 
-        public async Task<(List<StudentReportSummaryDto>? Data, ApiErrorResponseDTO? Error)> GetReportsSummaryAsync(int userId)
+        public async Task<Result<List<StudentReportSummaryDto>>> GetReportsSummaryAsync(int userId)
         {
             return await _reportsService.GetMyReportsAsync(userId);
         }
 
-        public async Task<(List<CollegeAdvisorDto>? Data, ApiErrorResponseDTO? Error)> GetCollegeAdvisorAsync(int userId)
+        public async Task<Result<List<CollegeAdvisorDto>>> GetCollegeAdvisorAsync(int userId)
         {
             var studentProfile = await _context.StudentProfiles
                 .Include(sp => sp.College)
@@ -140,11 +131,7 @@ namespace summer_training_app.Services.Implementations
 
             if (studentProfile == null)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UserNotFound,
-                    DevMessage = "Student profile not found."
-                });
+                return Error.NotFound(ErrorCodes.UserNotFound, "Student profile not found.");
             }
 
             var advisors = await _context.CollegeRepresentatives
@@ -161,10 +148,10 @@ namespace summer_training_app.Services.Implementations
                 })
                 .ToListAsync();
 
-            return (advisors, null);
+            return advisors;
         }
 
-        public async Task<(List<CollegeDocumentDto>? Data, ApiErrorResponseDTO? Error)> GetCollegeDocumentsAsync(int userId)
+        public async Task<Result<List<CollegeDocumentDto>>> GetCollegeDocumentsAsync(int userId)
         {
             var studentProfile = await _context.StudentProfiles
                 .AsNoTracking()
@@ -172,11 +159,7 @@ namespace summer_training_app.Services.Implementations
 
             if (studentProfile == null)
             {
-                return (null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UserNotFound,
-                    DevMessage = "Student profile not found."
-                });
+                return Error.NotFound(ErrorCodes.UserNotFound, "Student profile not found.");
             }
 
             var documents = await _context.CollegeDocuments
@@ -194,10 +177,10 @@ namespace summer_training_app.Services.Implementations
                 })
                 .ToListAsync();
 
-            return (documents, null);
+            return documents;
         }
 
-        public async Task<(string? PhysicalPath, string? ContentType, string? FileName, ApiErrorResponseDTO? Error)> GetMyProofFileAsync(Guid publicId, int userId)
+        public async Task<Result<(string PhysicalPath, string ContentType, string FileName)>> GetMyProofFileAsync(Guid publicId, int userId)
         {
             var request = await _context.TrainingRequests
                 .AsNoTracking()
@@ -205,22 +188,13 @@ namespace summer_training_app.Services.Implementations
 
             if (request == null || string.IsNullOrWhiteSpace(request.AcceptanceLetterPath))
             {
-                return (null, null, null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.FileNotFound,
-                    DevMessage = "Training request or proof file not found."
-                });
+                return Error.NotFound(ErrorCodes.FileNotFound, "Training request or proof file not found.");
             }
 
-            var result = await _filesService.DownloadFileAsync(request.AcceptanceLetterPath);
-
-            if (result.Error != null)
-                return (null, null, null, result.Error);
-
-            return (result.Data.Value.PhysicalPath, result.Data.Value.ContentType, result.Data.Value.FileName, null);
+            return await _filesService.DownloadFileAsync(request.AcceptanceLetterPath);
         }
 
-        public async Task<(string? PhysicalPath, string? ContentType, string? FileName, ApiErrorResponseDTO? Error)> DownloadCollegeDocumentAsync(int documentId, int userId)
+        public async Task<Result<(string PhysicalPath, string ContentType, string FileName)>> DownloadCollegeDocumentAsync(int documentId, int userId)
         {
             var studentProfile = await _context.StudentProfiles
                 .AsNoTracking()
@@ -228,11 +202,7 @@ namespace summer_training_app.Services.Implementations
 
             if (studentProfile == null)
             {
-                return (null, null, null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UserNotFound,
-                    DevMessage = "Student profile not found."
-                });
+                return Error.NotFound(ErrorCodes.UserNotFound, "Student profile not found.");
             }
 
             var document = await _context.CollegeDocuments
@@ -241,19 +211,10 @@ namespace summer_training_app.Services.Implementations
 
             if (document == null || string.IsNullOrWhiteSpace(document.FilePath))
             {
-                return (null, null, null, new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.DocumentNotFound,
-                    DevMessage = "College document not found."
-                });
+                return Error.NotFound(ErrorCodes.DocumentNotFound, "College document not found.");
             }
 
-            var result = await _filesService.DownloadFileAsync(document.FilePath);
-
-            if (result.Error != null)
-                return (null, null, null, result.Error);
-
-            return (result.Data.Value.PhysicalPath, result.Data.Value.ContentType, result.Data.Value.FileName, null);
+            return await _filesService.DownloadFileAsync(document.FilePath);
         }
     }
 }

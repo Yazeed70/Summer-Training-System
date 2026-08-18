@@ -1,10 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using summer_training_app.Common.Constants;
-using summer_training_app.DTOs.Shared;
 using summer_training_app.DTOs.Training;
 using summer_training_app.Extensions;
 using summer_training_app.Services.Interfaces;
@@ -30,21 +27,16 @@ namespace summer_training_app.Controllers.Training
             var studentId = User.GetInternalUserId();
             if (!studentId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _trainingService.SubmitRequestAsync(dto, studentId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return BadRequest(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(new { id = result.RequestPublicId });
+            return Ok(new { id = result.Value });
         }
 
         [HttpGet("college/pending-requests")]
@@ -55,21 +47,16 @@ namespace summer_training_app.Controllers.Training
             var userId = User.GetInternalUserId();
             if (!collegeId.HasValue || !userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with a college or internal user."
-                });
+                return this.ForbiddenProblem("User is not associated with a college or internal user.");
             }
 
             var result = await _trainingService.GetCollegePendingRequestsAsync(collegeId.Value, userId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return Unauthorized(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
         
         [HttpGet("student/pending-requests")]
@@ -79,21 +66,16 @@ namespace summer_training_app.Controllers.Training
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
             var result = await _trainingService.GetStudentPendingRequestsAsync(userId.Value);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return Unauthorized(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpGet("request/{requestPublicId}")]
@@ -101,13 +83,12 @@ namespace summer_training_app.Controllers.Training
         public async Task<IActionResult> GetPendingRequest(Guid requestPublicId)
         {
             var result = await _trainingService.GetPendingRequestAsync(requestPublicId);
-
-            if (result.Error != null)
+            if (result.IsFailure)
             {
-                return NotFound(result.Error);
+                return this.ToProblemDetails(result.Error);
             }
 
-            return Ok(result.Data);
+            return Ok(result.Value);
         }
 
         [HttpPost("process-request")]
@@ -117,24 +98,13 @@ namespace summer_training_app.Controllers.Training
             var reviewerUserId = User.GetInternalUserId();
             if (!reviewerUserId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
-            var error = await _trainingService.ProcessRequestAsync(dto, reviewerUserId.Value);
-
-            if (error != null)
+            var result = await _trainingService.ProcessRequestAsync(dto, reviewerUserId.Value);
+            if (result.IsFailure)
             {
-                if (error.Code == ErrorCodes.UnauthorizedAccess)
-                    return Unauthorized(error);
-
-                if (error.Code == ErrorCodes.RequestNotFound)
-                    return NotFound(error);
-
-                return BadRequest(error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok();
@@ -147,24 +117,13 @@ namespace summer_training_app.Controllers.Training
             var userId = User.GetInternalUserId();
             if (!userId.HasValue)
             {
-                return BadRequest(new ApiErrorResponseDTO
-                {
-                    Code = ErrorCodes.UnauthorizedAccess,
-                    DevMessage = "User is not associated with an internal user."
-                });
+                return this.UnauthorizedProblem();
             }
 
-            var error = await _trainingService.UpdateTrainingStatusAsync(dto, userId.Value);
-
-            if (error != null)
+            var result = await _trainingService.UpdateTrainingStatusAsync(dto, userId.Value);
+            if (result.IsFailure)
             {
-                if (error.Code == ErrorCodes.TrainingRequestNotFound)
-                    return NotFound(error);
-
-                if (error.Code == ErrorCodes.UnauthorizedAccess)
-                    return StatusCode(StatusCodes.Status403Forbidden, error);
-
-                return BadRequest(error);
+                return this.ToProblemDetails(result.Error);
             }
 
             return Ok();
