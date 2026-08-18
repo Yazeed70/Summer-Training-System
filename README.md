@@ -337,15 +337,19 @@ You can test endpoints directly in the browser by providing a Bearer token obtai
 
 ## Screenshots
 
-> *Screenshots demonstrating the multi-role dashboards, training request workflows, and report evaluation system.*
+> *Screenshots demonstrating the multi-role dashboards, and report evaluation system.*
 
 | Admin Overview | College Training Management |
 | :---: | :---: |
-| *(Placeholder: Add Admin Dashboard Screenshot)* | *(Placeholder: Add College Dashboard Screenshot)* |
+| <img src="./docs/admin-dashboard.png" width="450" alt="Admin Dashboard Screenshot"> | <img src="./docs/college-management.png" width="450" alt="College Dashboard Screenshot"> |
 
-| Dynamic Report Template Builder | Student Evaluation & Progress |
+| Dynamic Report Template Builder 1 | Dynamic Report Template Builder 2 |
 | :---: | :---: |
-| *(Placeholder: Add Report Builder Screenshot)* | *(Placeholder: Add Evaluation View Screenshot)* |
+| <img src="./docs/report-builder-1.png" width="450" alt="Report Builder Screenshot 1"> | <img src="./docs/report-builder-2.png" width="450" alt="Report Builder Screenshot 2"> |
+
+| Report Evaluation | Evaluation Progress |
+| :---: | :---: |
+| <img src="./docs/student-evaluation.png" width="450" alt="Report Evaluation Screenshot"> | <img src="./docs/evaluation-progress.png" width="450" alt="Evaluation Progress Screenshot"> |
 
 ---
 
