@@ -73,7 +73,8 @@ builder.Services.AddCors(options =>
                 "http://localhost:3000/", // React app running locally
                 "http://localhost:5173/", // React app running locally
                 "https://summer-training.netlify.app", // old link
-                "https://stms.base-dev.com" // new link
+                "https://stms.base-dev.com", // new link
+                "https://summer-training-system.vercel.app"
                 )
                   .AllowAnyHeader()
                   .AllowAnyMethod()
